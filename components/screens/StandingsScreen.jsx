@@ -55,11 +55,20 @@ async function copyText(text) {
   }
 }
 
-export default function StandingsScreen({ state, onNav }) {
+export default function StandingsScreen({ state, me, onNav }) {
   const { players, weeklyResults, currentWeek } = state;
   const standings = computeStandings(players, weeklyResults, currentWeek - 1);
   const sorted = [...standings].sort((a,b) => b.seasonPts - a.seasonPts);
-  const max = Math.max(1, ...sorted.map(s => s.seasonPts));
+  // Bars normalized to the SPREAD between leader and last place, not to the
+  // leader's absolute total. After 11 weeks of cumulative points, every
+  // player's bar would be ~70-95% full when normalized to the leader — they
+  // all look the same. By normalizing to (current - min) / (max - min), the
+  // gaps between players become readable: leader is full, last place is
+  // empty, midfield reads proportionally. Tells the league-is-close vs
+  // league-is-runaway story at a glance.
+  const minPts = Math.min(...sorted.map(s => s.seasonPts));
+  const maxPts = Math.max(...sorted.map(s => s.seasonPts));
+  const spread = Math.max(1, maxPts - minPts);
   const completedWeeks = weeklyResults.slice().sort((a,b) => a.wk - b.wk);
 
   // Copy-to-clipboard state. After a successful copy we flip the chip to
@@ -115,9 +124,18 @@ export default function StandingsScreen({ state, onNav }) {
     <div style={{ padding:'14px 20px 20px' }}>
       {sorted.map((p, i) => {
         const gap = i === 0 ? 0 : sorted[0].seasonPts - p.seasonPts;
+        const isMe = me && p.id === me.id;
+        // Bar fill: percent of the field's spread, with a tiny floor so last
+        // place still shows a sliver. The leader gets 100%, last gets ~6%,
+        // midfield is proportional. With one or zero completed weeks
+        // everyone has equal points → spread = 1 → bars all read full,
+        // which is honest ("nobody's ahead yet").
+        const barPct = Math.max(6, Math.round(((p.seasonPts - minPts) / spread) * 100));
         return <div key={p.id} style={{
-          padding:'14px 0',
+          padding:'14px 0 14px 12px',
+          marginLeft:-12,
           borderBottom: i === sorted.length-1 ? 'none' : `0.5px solid ${T.line2}`,
+          borderLeft: isMe ? `2px solid ${T.hot}` : '2px solid transparent',
           display:'flex', alignItems:'center', gap:14,
         }}>
           <div style={{ fontFamily: FD, fontSize:20, fontWeight:600, width:26, color: T.ink, lineHeight:1, fontVariantNumeric:'tabular-nums' }}>{String(i+1).padStart(2,'0')}</div>
@@ -125,10 +143,21 @@ export default function StandingsScreen({ state, onNav }) {
           <div style={{ flex:1, minWidth:0 }}>
             <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
               <span style={{ fontFamily: FD, fontSize:20, fontWeight:600, letterSpacing:'-0.03em', lineHeight:1 }}>{p.name}</span>
+              {isMe && <span style={{
+                fontFamily: FL, fontSize:8, fontWeight:700,
+                letterSpacing:'0.22em', textTransform:'uppercase',
+                color: T.hot,
+                padding:'2px 6px',
+                border:`1px solid ${T.hot}`, borderRadius:2,
+              }}>You</span>}
               <WinsCount wins={p.wins}/>
             </div>
             <div style={{ marginTop:6, height:2, background: T.bg2, borderRadius:0 }}>
-              <div style={{ width: `${(p.seasonPts / max) * 100}%`, height:'100%', background: i === 0 ? T.hot : T.ink2 }}/>
+              <div style={{
+                width: `${barPct}%`, height:'100%',
+                background: i === 0 ? T.hot : (isMe ? T.ink : T.ink2),
+                transition:'width 380ms cubic-bezier(0.32,0.72,0,1)',
+              }}/>
             </div>
           </div>
           <div style={{ textAlign:'right', minWidth:78 }}>
@@ -172,16 +201,23 @@ export default function StandingsScreen({ state, onNav }) {
               letterSpacing:'0.22em', textTransform:'uppercase', color: T.hot,
             }}>Total</div>
           </div>
-          {sorted.map((p, pi) => (
-            <div key={p.id} style={{
+          {sorted.map((p, pi) => {
+            const isMe = me && p.id === me.id;
+            // Subtle warm tint on the user's row — uses the same copper as
+            // the season-ranking accent but at low alpha so the column data
+            // remains readable. The sticky name cell uses the same tinted
+            // background so it doesn't visually fall off when scrolled.
+            const rowBg = isMe ? 'rgba(184,147,90,0.08)' : T.bg;
+            return <div key={p.id} style={{
               display:'grid',
               gridTemplateColumns:`72px repeat(${completedWeeks.length}, 38px) 56px`,
               alignItems:'center',
+              background: rowBg,
               borderBottom: pi === sorted.length-1 ? 'none' : `0.5px solid ${T.line2}`,
             }}>
               <div style={{
                 padding:'10px 6px', display:'flex', alignItems:'center', gap:6,
-                position:'sticky', left:0, background: T.bg,
+                position:'sticky', left:0, background: rowBg,
               }}>
                 <PlayerBadge player={p} size={18}/>
                 <span style={{ fontFamily: FD, fontSize:14, fontWeight:600, letterSpacing:'-0.03em' }}>{p.name.slice(0,4)}</span>
@@ -203,8 +239,8 @@ export default function StandingsScreen({ state, onNav }) {
                 fontFamily: FB, fontSize:13, fontWeight:600,
                 color: T.ink, fontVariantNumeric:'tabular-nums',
               }}>{p.seasonPts.toLocaleString()}</div>
-            </div>
-          ))}
+            </div>;
+          })}
         </div>
       </div>
     </>}

@@ -1,9 +1,9 @@
 'use client';
-import React from 'react';
+import React, { useState } from 'react';
 import { BackChip, CarNum, PlayerBadge, SectionLabel, TopBar } from '@/components/ui/primitives';
 import { FB, FD, FI, FL, SERIES, T } from '@/lib/constants';
 import { DEFAULT_DRIVERS } from '@/lib/data';
-import { downloadShareCard } from '@/lib/shareCard';
+import { shareOrDownloadCard } from '@/lib/shareCard';
 
 // Resolve a pick → driver definition with series awareness. Cup picks come
 // from the default pool + this week's one-off Cup adds. Bonus picks come from
@@ -55,10 +55,26 @@ export default function RecapScreen({ state, onNav }) {
   const hist = draftHistory.find(h => h.wk === last.wk);
   const raceMeta = (state.schedule || []).find(s => s.wk === last.wk);
 
-  // Trigger PNG download. Builds the share-card payload by attaching each
-  // player's roster chips to their result row (so the leader's drivers render
-  // in the bottom strip of the image).
-  const onShare = () => {
+  // Generates the share-card payload and routes through the system share
+  // sheet (Messages, AirDrop, Photos, etc.) on supporting devices, falling
+  // back to a download otherwise. The button label adapts to its capability:
+  // "Share" when native is available, "Download" otherwise — so users see
+  // the right verb for what will actually happen.
+  const [shareState, setShareState] = useState('idle'); // 'idle' | 'busy' | 'shared' | 'downloaded' | 'error'
+  // canShare is computed once on mount; recomputing it every render is cheap
+  // but the API only matters at click-time so we don't track it as state.
+  const supportsNativeShare = (() => {
+    if (typeof navigator === 'undefined') return false;
+    if (typeof navigator.canShare !== 'function') return false;
+    try {
+      const probe = new File(['x'], 'x.png', { type: 'image/png' });
+      return navigator.canShare({ files: [probe] });
+    } catch { return false; }
+  })();
+
+  const onShare = async () => {
+    if (shareState === 'busy') return;
+    setShareState('busy');
     const payload = {
       meta: { wk: last.wk, raceName: raceMeta?.raceName, track: last.track },
       players: sortedRes.map(p => {
@@ -78,8 +94,21 @@ export default function RecapScreen({ state, onNav }) {
         };
       }),
     };
-    downloadShareCard(payload);
+    const result = await shareOrDownloadCard(payload);
+    setShareState(result === 'cancelled' ? 'idle' : result);
+    if (result !== 'cancelled') {
+      try { navigator.vibrate?.(20); } catch {}
+      setTimeout(() => setShareState('idle'), 2000);
+    }
   };
+
+  const buttonLabel = (() => {
+    if (shareState === 'busy') return 'Preparing…';
+    if (shareState === 'shared') return '✓ Shared';
+    if (shareState === 'downloaded') return '✓ Saved';
+    if (shareState === 'error') return 'Try again';
+    return supportsNativeShare ? '↗ Share Race Card' : '↓ Download Race Card';
+  })();
 
   return <div style={{ paddingBottom:20 }}>
     <TopBar
@@ -102,16 +131,20 @@ export default function RecapScreen({ state, onNav }) {
         </div>
       </div>
 
-      <button onClick={onShare} style={{
+      <button onClick={onShare} disabled={shareState === 'busy'} style={{
         appearance:'none', width:'100%', marginTop:12,
-        background: T.hot, color: T.ink,
+        background: shareState === 'shared' || shareState === 'downloaded' ? T.good : T.hot,
+        color: shareState === 'shared' || shareState === 'downloaded' ? '#fff' : T.ink,
         border:'none', borderRadius:3,
-        padding:'12px 14px', cursor:'pointer',
+        padding:'12px 14px', cursor: shareState === 'busy' ? 'default' : 'pointer',
         fontFamily: FL, fontSize:11, fontWeight:600,
         letterSpacing:'0.24em', textTransform:'uppercase',
-      }}>↓ Download Share Card</button>
+        transition:'background 200ms ease, color 200ms ease',
+      }}>{buttonLabel}</button>
       <div style={{ marginTop:6, fontFamily: FI, fontStyle:'italic', fontSize:11, color: T.mute, lineHeight:1.5 }}>
-        Saves a 1080×1920 image perfect for the league group text.
+        {supportsNativeShare
+          ? 'Opens the share sheet — Messages, AirDrop, Photos, group chats.'
+          : 'Saves a 1080×1920 image perfect for the league group text.'}
       </div>
     </div>
 

@@ -234,7 +234,7 @@ export default function App() {
     draft:           <DraftScreen         state={state} setState={setState} me={me} onNav={onNav}/>,
     'enter-results': <EnterResultsScreen  state={state} setState={setState} me={me} onNav={onNav}/>,
     'edit-results':  <EnterResultsScreen  state={state} setState={setState} me={me} onNav={(id) => { setEditingWeek(null); onNav(id); }} editWeek={editingWeek}/>,
-    standings:       <StandingsScreen     state={state} onNav={onNav}/>,
+    standings:       <StandingsScreen     state={state} me={me} onNav={onNav}/>,
     team:            <TeamScreen          state={state} me={me} onNav={onNav}/>,
     recap:           <RecapScreen         state={state} onNav={onNav}/>,
     more:            <MoreScreen          state={state} me={me} setScreen={setScreen} onReset={resetSeason} onSignOut={() => setMeId(null)}/>,

@@ -4,7 +4,8 @@ import { BackChip, CarNum, PlayerBadge, SectionLabel, TopBar } from '@/component
 import { FB, FD, FI, FL, ROUNDS_PER_WEEK, SERIES, T } from '@/lib/constants';
 import { DEFAULT_DRIVERS } from '@/lib/data';
 import {
-  buildSnakeOrder, countPicksBySeries, getBonusPool, getWeekConfig, makeDriverWeekData,
+  buildSnakeOrder, computeAllDriverStats, countPicksBySeries, getBonusPool,
+  getWeekConfig, makeDriverWeekData,
 } from '@/lib/utils';
 
 // Helper: a stable composite key per pick "this driver in this series".
@@ -29,6 +30,15 @@ export default function DraftScreen({ state, setState, me, onNav }) {
     const merged = [...DEFAULT_DRIVERS, ...wkExtras];
     return makeDriverWeekData(merged, currentWeek * 100 + merged.length);
   }, [weekDriversExtra, currentWeek]);
+
+  // Decision-support stats for each driver — total picks, avg pts/draft,
+  // and the last 3 race scores when drafted. Drives the small stat block
+  // beneath each driver's name in the pool grid. Computed once per state
+  // change and reused per-card via Map lookup.
+  const driverStats = useMemo(() => {
+    const all = computeAllDriverStats(state);
+    return new Map(all.drivers.map(d => [d.num, d]));
+  }, [state]);
 
   const resetDraft = () => {
     if (!resetArm) { setResetArm(true); setTimeout(() => setResetArm(false), 3000); return; }
@@ -197,6 +207,7 @@ export default function DraftScreen({ state, setState, me, onNav }) {
       isEmpty={activePool.length === 0}
       isAdmin={isAdmin}
       onAddDriver={() => onNav('manage-drivers')}
+      driverStats={driverStats}
     />}
     {!done && activeSeries === 'Cup' && isAdmin && <div style={{ padding:'0 20px 24px' }}>
       <button onClick={() => onNav('manage-drivers')} style={{
@@ -286,7 +297,7 @@ function SeriesTabs({ cfg, picks, pickerId, active, onSelect, bonusPools }) {
 }
 
 // ── Driver pool grid ───────────────────────────────────────────────
-function DraftGrid({ drivers, pickedKeys, activeSeries, draftState, players, onPick, remaining, isEmpty, isAdmin, onAddDriver }) {
+function DraftGrid({ drivers, pickedKeys, activeSeries, draftState, players, onPick, remaining, isEmpty, isAdmin, onAddDriver, driverStats }) {
   if (isEmpty) {
     const meta = SERIES[activeSeries] || { label: activeSeries };
     return <div style={{ padding:'24px 20px' }}>
@@ -323,6 +334,11 @@ function DraftGrid({ drivers, pickedKeys, activeSeries, draftState, players, onP
           const taken = pickedKeys.has(pickKey(activeSeries, d.num));
           const takenBy = taken ? draftState.picks.find(p => p.driverNum === d.num && (p.series || 'Cup') === activeSeries) : null;
           const takenPl = takenBy ? players.find(p => p.id === takenBy.playerId) : null;
+          // Stats only meaningful for Cup picks (bonus pools are one-offs).
+          // We hide stats on already-taken cards because the card is muted
+          // and the user can't pick them anyway — keeping them readable
+          // would just compete with the "TONE" owner tag.
+          const stats = (!taken && activeSeries === 'Cup') ? driverStats?.get(d.num) : null;
           return <button key={d.num} onClick={() => !taken && onPick(d)} disabled={taken} style={{
             appearance:'none',
             position:'relative', overflow:'hidden',
@@ -366,6 +382,38 @@ function DraftGrid({ drivers, pickedKeys, activeSeries, draftState, players, onP
               wordBreak:'break-word',
               position:'relative', zIndex:1,
             }}>{d.name}</div>
+            {/* Stat block — small, muted, two lines max. The headline is the
+                season avg per draft because that's the single most useful
+                "should I pick this driver" number. Recent form (L3) goes
+                below as comma-separated points. Drivers never picked show
+                a "first draft" note instead so the card doesn't feel hollow.
+                Bonus-series picks have no stats — pool is per-week. */}
+            {stats && stats.totalPicks > 0 && <div style={{
+              position:'relative', zIndex:1,
+              display:'flex', flexDirection:'column', alignItems:'center', gap:1,
+              marginTop:-2,
+            }}>
+              <div style={{
+                fontFamily: FB, fontSize:11, fontWeight:600,
+                color: T.ink2, fontVariantNumeric:'tabular-nums', letterSpacing:'-0.01em',
+              }}>
+                <span>{stats.avgPts}</span>
+                <span style={{ color: T.mute, fontWeight:500 }}> avg</span>
+                <span style={{ color: T.mute, fontWeight:500 }}> · {stats.totalPicks}×</span>
+              </div>
+              {stats.weeks.length > 0 && <div style={{
+                fontFamily: FM, fontSize:9, color: T.mute,
+                fontVariantNumeric:'tabular-nums', letterSpacing:'0.02em',
+              }}>
+                L{Math.min(3, stats.weeks.length)}{' '}
+                {stats.weeks.slice(-3).map(w => w.pts).join(' · ')}
+              </div>}
+            </div>}
+            {!taken && activeSeries === 'Cup' && (!stats || stats.totalPicks === 0) && <div style={{
+              position:'relative', zIndex:1,
+              fontFamily: FI, fontStyle:'italic', fontSize:10, color: T.mute,
+              marginTop:-2,
+            }}>First draft</div>}
           </button>;
         })}
       </div>

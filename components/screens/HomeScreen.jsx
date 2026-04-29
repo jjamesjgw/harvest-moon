@@ -196,21 +196,31 @@ export default function HomeScreen({ state, me, onNav }) {
         <div style={{ padding:'18px 0', fontFamily: FI, fontStyle:'italic', fontSize:13, color: T.mute, lineHeight:1.5 }}>
           Standings open at 0 — finish the first race and the leaderboard fills in.
         </div>
-      ) : top3.map((p, i) => (
-        <div key={p.id} style={{
-          padding:'14px 0',
+      ) : top3.map((p, i) => {
+        const isMe = p.id === me.id;
+        return <div key={p.id} style={{
+          padding:'14px 0 14px 12px',
+          marginLeft: -12,
           borderBottom: i === top3.length-1 ? 'none' : `0.5px solid ${T.line2}`,
+          borderLeft: isMe ? `2px solid ${T.hot}` : '2px solid transparent',
           display:'flex', alignItems:'center', gap:14,
         }}>
           <div style={{ fontFamily: FD, fontSize:20, fontWeight:600, width:22, color: T.ink, lineHeight:1, fontVariantNumeric:'tabular-nums' }}>0{i+1}</div>
           <PlayerBadge player={p} size={26}/>
           <div style={{ flex:1, display:'flex', alignItems:'center', gap:8, minWidth:0, flexWrap:'wrap' }}>
             <span style={{ fontFamily: FD, fontSize:20, fontWeight:600, letterSpacing:'-0.03em', lineHeight:1 }}>{p.name}</span>
+            {isMe && <span style={{
+              fontFamily: FL, fontSize:8, fontWeight:700,
+              letterSpacing:'0.22em', textTransform:'uppercase',
+              color: T.hot,
+              padding:'2px 6px',
+              border:`1px solid ${T.hot}`, borderRadius:2,
+            }}>You</span>}
             <WinsCount wins={p.wins} compact/>
           </div>
           <div style={{ fontFamily: FB, fontSize:14, fontWeight:500, color: T.ink, fontVariantNumeric:'tabular-nums', letterSpacing:'-0.01em' }}>{p.seasonPts.toLocaleString()}</div>
-        </div>
-      ))}
+        </div>;
+      })}
     </div>
 
     {/* Upcoming */}
