@@ -20,15 +20,21 @@ export default function RecapScreen({ state, onNav }) {
   const last = weeklyResults.sort((a,b) => b.wk - a.wk)[0];
   const sortedRes = players.map(p => ({ ...p, pts: last.pts[p.id] || 0 })).sort((a,b) => b.pts - a.pts);
   const hist = draftHistory.find(h => h.wk === last.wk);
+  const raceMeta = (state.schedule || []).find(s => s.wk === last.wk);
 
   return <div style={{ paddingBottom:20 }}>
     <TopBar subtitle={`Wk ${String(last.wk).padStart(2,'0')} · Final`} title="Race Recap" right={<BackChip onClick={() => onNav('more')}/>}/>
 
     <div style={{ padding:'0 20px 20px' }}>
       <div style={{ background: T.ink, color: T.bg, borderRadius:4, padding:'22px 20px' }}>
-        <div style={{ fontFamily: FL, fontSize:9, fontWeight:500, letterSpacing:'0.24em', textTransform:'uppercase', color:'rgba(247,244,237,0.4)' }}>Track</div>
-        <div style={{ fontFamily: FD, fontSize:40, fontWeight:600, lineHeight:1, letterSpacing:'-0.03em', marginTop:4 }}>{last.track}</div>
-        <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:14, color:'rgba(247,244,237,0.6)', marginTop:10 }}>
+        <div style={{ fontFamily: FL, fontSize:9, fontWeight:500, letterSpacing:'0.24em', textTransform:'uppercase', color:'rgba(247,244,237,0.4)' }}>Race</div>
+        <div style={{ fontFamily: FD, fontSize:34, fontWeight:600, lineHeight:1, letterSpacing:'-0.03em', marginTop:4 }}>
+          {raceMeta?.raceName || last.track}
+        </div>
+        {raceMeta?.raceName && <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:13, color:'rgba(247,244,237,0.6)', marginTop:6 }}>
+          {last.track}
+        </div>}
+        <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:14, color:'rgba(247,244,237,0.7)', marginTop:10 }}>
           <span style={{ color: T.bg }}>{sortedRes[0].name}</span> took the week · {sortedRes[0].pts} pts
         </div>
       </div>

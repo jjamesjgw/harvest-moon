@@ -5,7 +5,7 @@ import { ADMIN_ID, FB, FD, FI, FL, T } from '@/lib/constants';
 import { DEFAULT_DRIVERS } from '@/lib/data';
 
 export default function HistoryScreen({ state, me, onBack, onEdit }) {
-  const { players, weeklyResults, draftHistory = [] } = state;
+  const { players, schedule = [], weeklyResults, draftHistory = [] } = state;
   const drivers = [...DEFAULT_DRIVERS, ...Object.values(state.weekDriversExtra || {}).flat()];
   const [expanded, setExpanded] = useState(null);
   const isAdmin = me?.id === ADMIN_ID;
@@ -20,6 +20,7 @@ export default function HistoryScreen({ state, me, onBack, onEdit }) {
         </div>
       ) : results.map((w, idx) => {
         const h = draftHistory.find(d => d.wk === w.wk);
+        const meta = schedule.find(s => s.wk === w.wk);
         const pts = Object.entries(w.pts);
         const topPid = pts.reduce((m, [pid, v]) => (!m || v > m[1]) ? [pid, v] : m, null);
         const winner = topPid ? players.find(p => p.id === topPid[0]) : null;
@@ -31,8 +32,9 @@ export default function HistoryScreen({ state, me, onBack, onEdit }) {
             display:'flex', alignItems:'center', gap:14,
           }}>
             <div style={{ fontFamily: FL, fontSize:10, fontWeight:500, letterSpacing:'0.2em', textTransform:'uppercase', color: T.mute, width:42 }}>Wk {String(w.wk).padStart(2,'0')}</div>
-            <div style={{ flex:1 }}>
-              <div style={{ fontFamily: FD, fontSize:18, fontWeight:600, letterSpacing:'-0.03em' }}>{w.track}</div>
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ fontFamily: FD, fontSize:18, fontWeight:600, letterSpacing:'-0.03em' }}>{meta?.raceName || w.track}</div>
+              {meta?.raceName && <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:12, color: T.ink2, marginTop:2 }}>{w.track}</div>}
               {winner && <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:4 }}>
                 <PlayerBadge player={winner} size={14}/>
                 <span style={{ fontFamily: FI, fontStyle:'italic', fontSize:12, color: T.mute }}>{winner.name} · {topPid[1]} pts</span>

@@ -1,6 +1,7 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import { T, FD, FI, FL, FB } from '@/lib/constants';
+import { raceCountdown } from '@/lib/utils';
 
 // ─── BASIC ATOMS ─────────────────────────────────────────────────
 
@@ -292,6 +293,50 @@ export function YourTurnToast({ kind, onGo }) {
       </div>
     </div>
   </button>;
+}
+
+// Live race countdown that re-renders every minute. Renders one of:
+//   • "Apr 26 · 3:00 PM ET · in 2d 4h"  (upcoming)
+//   • "Apr 26 · 3:00 PM ET · Live now"   (during race)
+//   • "Apr 26 · 3:00 PM ET · Final"      (after race)
+// Tone (color/label) auto-adjusts. Pass tone='dark' for use over the dark hero card.
+export function RaceCountdown({ date, time, network, tone = 'light', showNetwork = true, year }) {
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => tick(t => t + 1), 60_000);
+    return () => clearInterval(id);
+  }, []);
+  const cd = raceCountdown(date, time, new Date(), year);
+  const dim   = tone === 'dark' ? 'rgba(247,244,237,0.55)' : T.mute;
+  const main  = tone === 'dark' ? T.bg : T.ink2;
+  const liveColor = T.hot;
+  const finalColor = tone === 'dark' ? 'rgba(247,244,237,0.4)' : T.mute;
+
+  return <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+    <span style={{ fontFamily: FB, fontSize:12, fontWeight:500, color: main, fontVariantNumeric:'tabular-nums' }}>
+      {date}{time ? ` · ${time}` : ''}
+    </span>
+    {cd && cd.status === 'upcoming' && <span style={{
+      fontFamily: FL, fontSize:9, fontWeight:600,
+      letterSpacing:'0.18em', textTransform:'uppercase',
+      color: dim, fontVariantNumeric:'tabular-nums',
+    }}>· in {cd.label}</span>}
+    {cd && cd.status === 'live' && <span style={{
+      padding:'2px 7px', background: liveColor, color:'#fff', borderRadius:2,
+      fontFamily: FL, fontSize:9, fontWeight:700, letterSpacing:'0.2em', textTransform:'uppercase',
+      animation:'pulse 1.6s ease-in-out infinite',
+    }}>Live now</span>}
+    {cd && cd.status === 'final' && <span style={{
+      fontFamily: FL, fontSize:9, fontWeight:600, letterSpacing:'0.2em',
+      textTransform:'uppercase', color: finalColor,
+    }}>· Final</span>}
+    {showNetwork && network && <span style={{
+      padding:'2px 8px', background: tone === 'dark' ? T.hot : 'rgba(20,17,13,0.06)',
+      color: tone === 'dark' ? T.ink : T.ink, borderRadius:2,
+      fontFamily: FL, fontSize:9, fontWeight:700,
+      letterSpacing:'0.2em', textTransform:'uppercase',
+    }}>{network}</span>}
+  </div>;
 }
 
 // Slim status strip for "league members are mid-draft and someone else is on the clock".

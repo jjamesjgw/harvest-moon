@@ -1,6 +1,6 @@
 'use client';
 import React from 'react';
-import { PlayerBadge, SectionLabel, TopBar } from '@/components/ui/primitives';
+import { PlayerBadge, RaceCountdown, SectionLabel, TopBar } from '@/components/ui/primitives';
 import { InstallHint } from '@/components/ui/InstallHint';
 import { ADMIN_ID, FB, FD, FI, FL, ROUNDS_PER_WEEK, T } from '@/lib/constants';
 import { computeStandings, ordinalSuffix } from '@/lib/utils';
@@ -101,22 +101,31 @@ export default function HomeScreen({ state, me, onNav }) {
               Round {String(currentWeek).padStart(2,'0')}
             </div>
           </div>
-          <div style={{ fontFamily: FD, fontSize:44, fontWeight:600, lineHeight:0.95, letterSpacing:'-0.03em' }}>{currentRace.track}</div>
-          <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:13, color:'rgba(247,244,237,0.55)', marginTop:8, letterSpacing:'0.01em' }}>
+          <div style={{ fontFamily: FD, fontSize:44, fontWeight:600, lineHeight:0.95, letterSpacing:'-0.03em' }}>
+            {currentRace.raceName || currentRace.track}
+          </div>
+          <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:13, color:'rgba(247,244,237,0.7)', marginTop:6, letterSpacing:'0.01em' }}>
+            {currentRace.track}
+          </div>
+          <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:12, color:'rgba(247,244,237,0.45)', marginTop:4, letterSpacing:'0.01em' }}>
             {currentRace.type} · {currentRace.len} mi · {currentRace.laps} laps
           </div>
-          {(currentRace.time || currentRace.network) && <div style={{ marginTop:10, display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
-            {currentRace.time && <span style={{
-              fontFamily: FB, fontSize:12, fontWeight:500,
-              color: T.bg, fontVariantNumeric:'tabular-nums',
-            }}>{currentRace.date} · {currentRace.time}</span>}
-            {currentRace.network && <span style={{
-              padding:'2px 8px',
-              background: T.hot, color: T.ink,
-              borderRadius:2,
-              fontFamily: FL, fontSize:9, fontWeight:700,
-              letterSpacing:'0.2em', textTransform:'uppercase',
-            }}>{currentRace.network}</span>}
+          {(currentRace.time || currentRace.network) && <div style={{ marginTop:12 }}>
+            <RaceCountdown
+              date={currentRace.date}
+              time={currentRace.time}
+              network={currentRace.network}
+              tone="dark"
+            />
+          </div>}
+          {currentRace.lastWinner && <div style={{
+            marginTop:10, paddingTop:10,
+            borderTop:'0.5px solid rgba(247,244,237,0.08)',
+            fontFamily: FL, fontSize:9, fontWeight:500,
+            letterSpacing:'0.22em', textTransform:'uppercase',
+            color:'rgba(247,244,237,0.4)',
+          }}>
+            2025 Winner · <span style={{ fontFamily: FB, fontSize:12, fontWeight:600, letterSpacing:'-0.005em', textTransform:'none', color:'rgba(247,244,237,0.85)' }}>{currentRace.lastWinner}</span>
           </div>}
         </div>
         <div style={{ padding:'14px 20px', borderTop:'0.5px solid rgba(247,244,237,0.08)', display:'flex', gap:12, alignItems:'center' }}>
@@ -190,9 +199,9 @@ export default function HomeScreen({ state, me, onNav }) {
           }}>
             <div style={{ fontFamily: FL, fontSize:10, fontWeight:500, letterSpacing:'0.2em', textTransform:'uppercase', color: T.mute, width:56 }}>Wk {String(race.wk).padStart(2,'0')}</div>
             <div style={{ flex:1 }}>
-              <div style={{ fontFamily: FD, fontSize:20, fontWeight:600, letterSpacing:'-0.03em', lineHeight:1.1 }}>{race.track}</div>
+              <div style={{ fontFamily: FD, fontSize:18, fontWeight:600, letterSpacing:'-0.03em', lineHeight:1.1 }}>{race.raceName || race.track}</div>
               <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:12, color: T.mute, marginTop:3 }}>
-                {race.type} · {race.date}{race.time ? ` · ${race.time}` : ''}{race.network ? ` · ${race.network}` : ''}
+                {race.raceName ? `${race.track} · ` : ''}{race.date}{race.time ? ` · ${race.time}` : ''}{race.network ? ` · ${race.network}` : ''}
               </div>
             </div>
           </div>
