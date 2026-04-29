@@ -1,5 +1,5 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { BackChip, PlayerBadge, SectionLabel, TopBar, WinsCount } from '@/components/ui/primitives';
 import { FB, FD, FI, FL, T } from '@/lib/constants';
 import { computeStandings } from '@/lib/utils';
@@ -173,76 +173,149 @@ export default function StandingsScreen({ state, me, onNav }) {
     </div>
 
     {completedWeeks.length > 0 && <>
-      <SectionLabel right={<span style={{ fontFamily: FI, fontStyle:'italic', fontSize:11, textTransform:'none', letterSpacing:'0.01em', color: T.mute }}>Scroll →</span>}>By Week</SectionLabel>
+      <SectionLabel>By Week</SectionLabel>
       <div style={{ padding:'14px 20px 20px' }}>
-        <div style={{
-          borderTop:`0.5px solid ${T.line}`, borderBottom:`0.5px solid ${T.line}`,
-          overflowX:'auto', overflowY:'hidden',
-        }}>
-          <div style={{
-            display:'grid',
-            gridTemplateColumns:`72px repeat(${completedWeeks.length}, 38px) 56px`,
-            padding:'8px 0', borderBottom:`0.5px solid ${T.line2}`,
-            background: T.bg, position:'sticky', top:0,
-          }}>
-            <div style={{
-              padding:'0 6px', fontFamily: FL, fontSize:9, fontWeight:600,
-              letterSpacing:'0.22em', textTransform:'uppercase', color: T.mute,
-              position:'sticky', left:0, background: T.bg,
-            }}>Player</div>
-            {completedWeeks.map(w => (
-              <div key={w.wk} style={{
-                textAlign:'center', fontFamily: FB, fontSize:11, fontWeight:600,
-                color: T.mute, fontVariantNumeric:'tabular-nums',
-              }}>{String(w.wk).padStart(2,'0')}</div>
-            ))}
-            <div style={{
-              textAlign:'right', paddingRight:6, fontFamily: FL, fontSize:9, fontWeight:600,
-              letterSpacing:'0.22em', textTransform:'uppercase', color: T.hot,
-            }}>Total</div>
-          </div>
-          {sorted.map((p, pi) => {
-            const isMe = me && p.id === me.id;
-            // Subtle warm tint on the user's row — uses the same copper as
-            // the season-ranking accent but at low alpha so the column data
-            // remains readable. The sticky name cell uses the same tinted
-            // background so it doesn't visually fall off when scrolled.
-            const rowBg = isMe ? 'rgba(184,147,90,0.08)' : T.bg;
-            return <div key={p.id} style={{
-              display:'grid',
-              gridTemplateColumns:`72px repeat(${completedWeeks.length}, 38px) 56px`,
-              alignItems:'center',
-              background: rowBg,
-              borderBottom: pi === sorted.length-1 ? 'none' : `0.5px solid ${T.line2}`,
-            }}>
-              <div style={{
-                padding:'10px 6px', display:'flex', alignItems:'center', gap:6,
-                position:'sticky', left:0, background: rowBg,
-              }}>
-                <PlayerBadge player={p} size={18}/>
-                <span style={{ fontFamily: FD, fontSize:14, fontWeight:600, letterSpacing:'-0.03em' }}>{p.name.slice(0,4)}</span>
-              </div>
-              {completedWeeks.map(w => {
-                const wpts = Object.values(w.pts);
-                const wkMax = Math.max(...wpts);
-                const mypts = w.pts[p.id] || 0;
-                const isTop = mypts === wkMax && wpts.length > 0;
-                return <div key={w.wk} style={{
-                  textAlign:'center', padding:'10px 0',
-                  fontFamily: FB, fontSize:12, fontWeight: isTop ? 600 : 400,
-                  color: isTop ? T.hot : T.ink2,
-                  fontVariantNumeric:'tabular-nums',
-                }}>{mypts}</div>;
-              })}
-              <div style={{
-                textAlign:'right', paddingRight:6,
-                fontFamily: FB, fontSize:13, fontWeight:600,
-                color: T.ink, fontVariantNumeric:'tabular-nums',
-              }}>{p.seasonPts.toLocaleString()}</div>
-            </div>;
-          })}
-        </div>
+        <ScrollableWeekTable
+          completedWeeks={completedWeeks}
+          sorted={sorted}
+          me={me}
+        />
       </div>
     </>}
+  </div>;
+}
+
+// ── Scrollable By-Week table with edge-fade discoverability ─────────
+// The table is wider than the viewport whenever the league has played
+// more than ~5 weeks. The previous "Scroll →" italic hint above the
+// table was easy to miss. This component overlays a fade gradient and
+// a small chevron pip on whichever edge has more content beyond the
+// current scroll position. Pure CSS gradients + a scroll listener that
+// toggles two booleans (hasMoreLeft / hasMoreRight). The pip points in
+// the direction the user can still scroll, mirroring how iOS surfaces
+// scrollable areas in apps like Photos.
+function ScrollableWeekTable({ completedWeeks, sorted, me }) {
+  const scrollRef = useRef(null);
+  const [hasMoreLeft, setHasMoreLeft] = useState(false);
+  const [hasMoreRight, setHasMoreRight] = useState(false);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const update = () => {
+      // 2px tolerance so subpixel scroll positions don't flicker the pip
+      // on/off at the boundaries.
+      setHasMoreLeft(el.scrollLeft > 2);
+      setHasMoreRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 2);
+    };
+    update();
+    el.addEventListener('scroll', update, { passive: true });
+    // Re-check on window resize since clientWidth changes with rotation.
+    window.addEventListener('resize', update);
+    return () => {
+      el.removeEventListener('scroll', update);
+      window.removeEventListener('resize', update);
+    };
+    // Re-run when the column count changes (e.g. a new week is added).
+  }, [completedWeeks.length]);
+
+  return <div style={{
+    position:'relative',
+    borderTop:`0.5px solid ${T.line}`, borderBottom:`0.5px solid ${T.line}`,
+  }}>
+    <div ref={scrollRef} style={{
+      overflowX:'auto', overflowY:'hidden',
+    }}>
+      <div style={{
+        display:'grid',
+        gridTemplateColumns:`72px repeat(${completedWeeks.length}, 38px) 56px`,
+        padding:'8px 0', borderBottom:`0.5px solid ${T.line2}`,
+        background: T.bg, position:'sticky', top:0,
+      }}>
+        <div style={{
+          padding:'0 6px', fontFamily: FL, fontSize:9, fontWeight:600,
+          letterSpacing:'0.22em', textTransform:'uppercase', color: T.mute,
+          position:'sticky', left:0, background: T.bg,
+        }}>Player</div>
+        {completedWeeks.map(w => (
+          <div key={w.wk} style={{
+            textAlign:'center', fontFamily: FB, fontSize:11, fontWeight:600,
+            color: T.mute, fontVariantNumeric:'tabular-nums',
+          }}>{String(w.wk).padStart(2,'0')}</div>
+        ))}
+        <div style={{
+          textAlign:'right', paddingRight:6, fontFamily: FL, fontSize:9, fontWeight:600,
+          letterSpacing:'0.22em', textTransform:'uppercase', color: T.hot,
+        }}>Total</div>
+      </div>
+      {sorted.map((p, pi) => {
+        const isMe = me && p.id === me.id;
+        const rowBg = isMe ? 'rgba(184,147,90,0.08)' : T.bg;
+        return <div key={p.id} style={{
+          display:'grid',
+          gridTemplateColumns:`72px repeat(${completedWeeks.length}, 38px) 56px`,
+          alignItems:'center',
+          background: rowBg,
+          borderBottom: pi === sorted.length-1 ? 'none' : `0.5px solid ${T.line2}`,
+        }}>
+          <div style={{
+            padding:'10px 6px', display:'flex', alignItems:'center', gap:6,
+            position:'sticky', left:0, background: rowBg,
+          }}>
+            <PlayerBadge player={p} size={18}/>
+            <span style={{ fontFamily: FD, fontSize:14, fontWeight:600, letterSpacing:'-0.03em' }}>{p.name.slice(0,4)}</span>
+          </div>
+          {completedWeeks.map(w => {
+            const wpts = Object.values(w.pts);
+            const wkMax = Math.max(...wpts);
+            const mypts = w.pts[p.id] || 0;
+            const isTop = mypts === wkMax && wpts.length > 0;
+            return <div key={w.wk} style={{
+              textAlign:'center', padding:'10px 0',
+              fontFamily: FB, fontSize:12, fontWeight: isTop ? 600 : 400,
+              color: isTop ? T.hot : T.ink2,
+              fontVariantNumeric:'tabular-nums',
+            }}>{mypts}</div>;
+          })}
+          <div style={{
+            textAlign:'right', paddingRight:6,
+            fontFamily: FB, fontSize:13, fontWeight:600,
+            color: T.ink, fontVariantNumeric:'tabular-nums',
+          }}>{p.seasonPts.toLocaleString()}</div>
+        </div>;
+      })}
+    </div>
+    {/* Edge-fade gradients + chevron pips. Each layer is pointer-events:
+        none so they don't block scroll/touch. The gradients start fully
+        opaque against the cream bg at the edge and fade to transparent
+        ~32px in, giving a soft hint that more content lives offscreen. */}
+    {hasMoreLeft && <div style={{
+      position:'absolute', left:0, top:0, bottom:0, width:32,
+      pointerEvents:'none',
+      background:`linear-gradient(90deg, ${T.bg} 0%, rgba(247,244,237,0) 100%)`,
+    }}/>}
+    {hasMoreRight && <div style={{
+      position:'absolute', right:0, top:0, bottom:0, width:32,
+      pointerEvents:'none',
+      background:`linear-gradient(270deg, ${T.bg} 0%, rgba(247,244,237,0) 100%)`,
+    }}/>}
+    {hasMoreRight && <div style={{
+      position:'absolute', right:6, top:'50%', transform:'translateY(-50%)',
+      pointerEvents:'none',
+      width:18, height:18, borderRadius:'50%',
+      background: T.ink, color: T.bg,
+      display:'flex', alignItems:'center', justifyContent:'center',
+      fontSize:11, fontFamily: FD, lineHeight:1,
+      boxShadow:'0 1px 4px rgba(0,0,0,0.15)',
+    }}>›</div>}
+    {hasMoreLeft && <div style={{
+      position:'absolute', left:6, top:'50%', transform:'translateY(-50%)',
+      pointerEvents:'none',
+      width:18, height:18, borderRadius:'50%',
+      background: T.ink, color: T.bg,
+      display:'flex', alignItems:'center', justifyContent:'center',
+      fontSize:11, fontFamily: FD, lineHeight:1,
+      boxShadow:'0 1px 4px rgba(0,0,0,0.15)',
+    }}>‹</div>}
   </div>;
 }

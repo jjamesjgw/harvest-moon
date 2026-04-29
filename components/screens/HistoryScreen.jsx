@@ -2,31 +2,7 @@
 import React, { useState } from 'react';
 import { BackChip, CarNum, PlayerBadge, TopBar } from '@/components/ui/primitives';
 import { ADMIN_ID, FB, FD, FI, FL, SERIES, T } from '@/lib/constants';
-import { DEFAULT_DRIVERS } from '@/lib/data';
-
-// Look up a pick's driver definition. Cup picks resolve from default + week
-// extras; bonus picks come from bonusDriversByWeek[wk][series]. As a final
-// fallback, synthesize a stub from the pick's own driverName snapshot —
-// that ensures historical picks stay viewable even if the admin later edits
-// the bonus pool.
-function resolvePickDriver(state, wk, pk) {
-  const series = pk.series || 'Cup';
-  if (series === 'Cup') {
-    const wkExtras = (state.weekDriversExtra || {})[wk] || [];
-    const cup = [...DEFAULT_DRIVERS, ...wkExtras];
-    return cup.find(d => d.num === pk.driverNum) || stubDriver(pk);
-  }
-  const pool = state.bonusDriversByWeek?.[wk]?.[series] || [];
-  return pool.find(d => d.num === pk.driverNum) || stubDriver(pk);
-}
-function stubDriver(pk) {
-  return {
-    num: pk.driverNum,
-    name: pk.driverName || `#${pk.driverNum}`,
-    primary: '#7A7268', secondary: '#3D3934',
-    team: '—',
-  };
-}
+import { resolvePickDriver } from '@/lib/utils';
 
 // Small series tag rendered next to a bonus chip ("TRK", "O'R", "HL").
 function SeriesTag({ series }) {
@@ -44,12 +20,36 @@ function SeriesTag({ series }) {
 
 export default function HistoryScreen({ state, me, onBack, onEdit, onNav }) {
   const { players, schedule = [], weeklyResults, draftHistory = [] } = state;
-  const [expanded, setExpanded] = useState(null);
+  // Multi-expand. The single-expand UX fought the most common analytical
+  // use case ("how did Trey do at Bristol last spring vs this fall?") —
+  // opening row B closed row A. Now expansions accumulate; users can keep
+  // any number of weeks open. The header gains a "Collapse all" affordance
+  // when at least one row is open, so it's still easy to clear the view.
+  const [expanded, setExpanded] = useState(() => new Set());
+  const toggle = (wk) => setExpanded(prev => {
+    const next = new Set(prev);
+    if (next.has(wk)) next.delete(wk); else next.add(wk);
+    return next;
+  });
+  const collapseAll = () => setExpanded(new Set());
+
   const isAdmin = me?.id === ADMIN_ID;
   const results = weeklyResults.sort((a,b) => b.wk - a.wk);
 
   return <div style={{ paddingBottom:20 }}>
-    <TopBar subtitle={`${results.length} completed week${results.length === 1 ? '' : 's'}`} title="History" right={<BackChip onClick={onBack}/>}/>
+    <TopBar
+      subtitle={`${results.length} completed week${results.length === 1 ? '' : 's'}`}
+      title="History"
+      right={<BackChip onClick={onBack}/>}
+    />
+    {expanded.size > 0 && <div style={{ padding:'0 20px 4px', display:'flex', justifyContent:'flex-end' }}>
+      <button onClick={collapseAll} style={{
+        appearance:'none', background:'transparent', border:'none',
+        padding:'4px 6px', cursor:'pointer',
+        fontFamily: FL, fontSize:9, fontWeight:600,
+        letterSpacing:'0.22em', textTransform:'uppercase', color: T.mute,
+      }}>Collapse all ({expanded.size})</button>
+    </div>}
     <div style={{ padding:'14px 20px 20px' }}>
       {results.length === 0 ? (
         <div style={{ padding:'28px 10px', textAlign:'center', fontFamily: FI, fontStyle:'italic', fontSize:14, color: T.mute }}>
@@ -61,9 +61,9 @@ export default function HistoryScreen({ state, me, onBack, onEdit, onNav }) {
         const pts = Object.entries(w.pts);
         const topPid = pts.reduce((m, [pid, v]) => (!m || v > m[1]) ? [pid, v] : m, null);
         const winner = topPid ? players.find(p => p.id === topPid[0]) : null;
-        const isExp = expanded === w.wk;
+        const isExp = expanded.has(w.wk);
         return <div key={w.wk} style={{ borderBottom: idx === results.length-1 ? 'none' : `0.5px solid ${T.line2}` }}>
-          <button onClick={() => setExpanded(isExp ? null : w.wk)} style={{
+          <button onClick={() => toggle(w.wk)} style={{
             appearance:'none', width:'100%', background:'transparent', border:'none',
             padding:'14px 0', cursor:'pointer', textAlign:'left',
             display:'flex', alignItems:'center', gap:14,

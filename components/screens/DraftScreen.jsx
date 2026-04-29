@@ -5,7 +5,7 @@ import { FB, FD, FI, FL, ROUNDS_PER_WEEK, SERIES, T } from '@/lib/constants';
 import { DEFAULT_DRIVERS } from '@/lib/data';
 import {
   buildSnakeOrder, computeAllDriverStats, countPicksBySeries, getBonusPool,
-  getWeekConfig, makeDriverWeekData,
+  getWeekConfig,
 } from '@/lib/utils';
 
 // Helper: a stable composite key per pick "this driver in this series".
@@ -27,8 +27,7 @@ export default function DraftScreen({ state, setState, me, onNav }) {
   // Cup driver pool (default 36 + this week's one-offs from Manage Drivers).
   const cupDrivers = useMemo(() => {
     const wkExtras = (weekDriversExtra || {})[currentWeek] || [];
-    const merged = [...DEFAULT_DRIVERS, ...wkExtras];
-    return makeDriverWeekData(merged, currentWeek * 100 + merged.length);
+    return [...DEFAULT_DRIVERS, ...wkExtras];
   }, [weekDriversExtra, currentWeek]);
 
   // Decision-support stats for each driver — total picks, avg pts/draft,

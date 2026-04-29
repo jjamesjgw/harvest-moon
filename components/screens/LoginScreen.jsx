@@ -1,6 +1,7 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
 import { ADMIN_PROFILE, FB, FD, FI, FL, FM, PLAYER_PINS, T } from '@/lib/constants';
+import { supabase } from '@/lib/supabase';
 
 // Tile-based login. Six player avatars in a 3×2 grid + a discreet "Admin"
 // link below. Tapping a tile selects that player and reveals the PIN field;
@@ -32,18 +33,67 @@ export default function LoginScreen({ onLogin, players }) {
     return () => clearTimeout(t);
   }, [activeKey]);
 
-  const submit = () => {
+  // Verify PIN against the server-side `verify_pin` Postgres function. The
+  // function reads bcrypt-hashed PINs from a table that's locked off from
+  // anon entirely; only this function (SECURITY DEFINER) can read it.
+  // Returns one of:
+  //   { ok: true }           — PIN matched
+  //   { ok: false }          — PIN didn't match (auth failure — do NOT fall back)
+  //   { ok: false, transport: true } — couldn't reach server (use local fallback)
+  const verifyServerSide = async (name, candidatePin) => {
+    try {
+      const { data, error } = await supabase.rpc('verify_pin', { p_name: name, p_pin: candidatePin });
+      if (error) {
+        // Treat any RPC error as a transport problem rather than a hard auth
+        // rejection — keeps the league able to sign in even if the function
+        // is temporarily missing or rate-limited. The client-side fallback
+        // catches it.
+        return { ok: false, transport: true };
+      }
+      return { ok: data === true };
+    } catch {
+      return { ok: false, transport: true };
+    }
+  };
+
+  const [busy, setBusy] = useState(false);
+  const submit = async () => {
+    if (busy) return;
     if (!activeKey) { setErr('Choose your tile to start.'); return; }
     if (pin.length !== 4) { setErr('PIN is 4 digits.'); return; }
-    const expected = PLAYER_PINS[activeKey];
-    if (!expected) { setErr('Profile not found.'); return; }
-    if (pin !== expected) { setErr('Incorrect PIN.'); return; }
-    const account = activeKey === 'admin'
-      ? ADMIN_PROFILE
-      : players.find(p => p.name.toLowerCase() === activeKey);
-    if (!account) { setErr('Could not load your profile. Try again.'); return; }
-    setErr(null);
-    onLogin(account);
+    setBusy(true);
+    try {
+      const account = activeKey === 'admin'
+        ? ADMIN_PROFILE
+        : players.find(p => p.name.toLowerCase() === activeKey);
+      if (!account) { setErr('Could not load your profile. Try again.'); return; }
+
+      // Try server-side verification first.
+      const result = await verifyServerSide(activeKey, pin);
+      if (result.ok) {
+        setErr(null);
+        onLogin(account);
+        return;
+      }
+      // Server rejected the PIN outright (not a transport error). Show error,
+      // do NOT fall back to client check — that would defeat the purpose.
+      if (!result.transport) {
+        setErr('Incorrect PIN.');
+        return;
+      }
+
+      // Transport failure (offline, rate-limited, RPC missing). Fall back to
+      // the bundled PIN check so the league isn't locked out by a Supabase
+      // outage. The bundled PINs will be removed in a follow-up drop once
+      // we're confident the server path is reliable.
+      const expected = PLAYER_PINS[activeKey];
+      if (!expected) { setErr('Profile not found.'); return; }
+      if (pin !== expected) { setErr('Incorrect PIN.'); return; }
+      setErr(null);
+      onLogin(account);
+    } finally {
+      setBusy(false);
+    }
   };
 
   const selectPlayer = (key) => {
@@ -213,13 +263,16 @@ export default function LoginScreen({ onLogin, players }) {
           fontFamily: FI, fontStyle:'italic', fontSize:13, color: T.hot,
           textAlign:'center', marginTop:10,
         }}>{err}</div>}
-        <button onClick={submit} style={{
+        <button onClick={submit} disabled={busy} style={{
           appearance:'none', width:'100%', marginTop:12, padding:16,
           background:'linear-gradient(180deg, #C9A268 0%, #B8935A 50%, #9A7A48 100%)',
-          color: T.ink, border:'1px solid rgba(255,255,255,0.15)', borderRadius:8, cursor:'pointer',
+          color: T.ink, border:'1px solid rgba(255,255,255,0.15)', borderRadius:8,
+          cursor: busy ? 'default' : 'pointer',
+          opacity: busy ? 0.65 : 1,
           fontFamily: FL, fontSize:11, fontWeight:600, letterSpacing:'0.28em', textTransform:'uppercase',
           boxShadow:'inset 0 1px 0 rgba(255,255,255,0.4), 0 6px 20px rgba(0,0,0,0.5)',
-        }}>Sign In</button>
+          transition:'opacity 200ms ease',
+        }}>{busy ? 'Verifying…' : 'Sign In'}</button>
       </div>
     </div>
 

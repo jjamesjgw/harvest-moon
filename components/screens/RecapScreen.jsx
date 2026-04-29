@@ -2,29 +2,8 @@
 import React, { useState } from 'react';
 import { BackChip, CarNum, PlayerBadge, SectionLabel, TopBar } from '@/components/ui/primitives';
 import { FB, FD, FI, FL, SERIES, T } from '@/lib/constants';
-import { DEFAULT_DRIVERS } from '@/lib/data';
 import { shareOrDownloadCard } from '@/lib/shareCard';
-
-// Resolve a pick → driver definition with series awareness. Cup picks come
-// from the default pool + this week's one-off Cup adds. Bonus picks come from
-// the per-week bonus pool. Falls back to a stub from pick.driverName if the
-// pool entry was later removed.
-function resolveDriver(state, wk, pk) {
-  const series = pk.series || 'Cup';
-  if (series === 'Cup') {
-    const wkExtras = (state.weekDriversExtra || {})[wk] || [];
-    const cup = [...DEFAULT_DRIVERS, ...wkExtras];
-    return cup.find(d => d.num === pk.driverNum) || stub(pk);
-  }
-  const pool = state.bonusDriversByWeek?.[wk]?.[series] || [];
-  return pool.find(d => d.num === pk.driverNum) || stub(pk);
-}
-function stub(pk) {
-  return {
-    num: pk.driverNum, name: pk.driverName || `#${pk.driverNum}`,
-    primary: '#7A7268', secondary: '#3D3934', team: '—',
-  };
-}
+import { resolvePickDriver } from '@/lib/utils';
 
 function SeriesTag({ series }) {
   if (!series || series === 'Cup') return null;
@@ -84,7 +63,7 @@ export default function RecapScreen({ state, onNav }) {
           color: p.color,
           pts: p.pts,
           drivers: myPicks.map(pk => {
-            const d = resolveDriver(state, last.wk, pk);
+            const d = resolvePickDriver(state, last.wk, pk);
             return {
               num: d.num, name: d.name,
               primary: d.primary, secondary: d.secondary,
@@ -182,7 +161,7 @@ export default function RecapScreen({ state, onNav }) {
               </div>
               <div style={{ display:'flex', gap:5, flexWrap:'wrap', alignItems:'center' }}>
                 {roster.map((pk, pi) => {
-                  const d = resolveDriver(state, last.wk, pk);
+                  const d = resolvePickDriver(state, last.wk, pk);
                   const series = pk.series || 'Cup';
                   // Only Cup chips are tappable — they have season-wide stats.
                   // Bonus picks come from one-week pools, so opening "driver

@@ -3,26 +3,7 @@ import React, { useMemo, useState } from 'react';
 import { BackChip, CarNum, DriverRow, SectionLabel, TopBar } from '@/components/ui/primitives';
 import { FB, FD, FI, FL, SERIES, T } from '@/lib/constants';
 import { DEFAULT_DRIVERS } from '@/lib/data';
-import { getBonusPool, getWeekConfig, makeDriverWeekData } from '@/lib/utils';
-
-// Pull a driver definition for any pick (Cup or bonus). Falls back to a stub
-// if the pool entry was later removed by the admin so historical rosters
-// always render something rather than silently dropping picks.
-function resolveDriver(state, wk, pk) {
-  const series = pk.series || 'Cup';
-  if (series === 'Cup') {
-    const wkExtras = (state.weekDriversExtra || {})[wk] || [];
-    const cup = [...DEFAULT_DRIVERS, ...wkExtras];
-    return cup.find(d => d.num === pk.driverNum) || stub(pk);
-  }
-  return getBonusPool(state, wk, series).find(d => d.num === pk.driverNum) || stub(pk);
-}
-function stub(pk) {
-  return {
-    num: pk.driverNum, name: pk.driverName || `#${pk.driverNum}`,
-    primary: '#7A7268', secondary: '#3D3934', team: '—',
-  };
-}
+import { getWeekConfig, resolvePickDriver } from '@/lib/utils';
 
 function SeriesTag({ series }) {
   if (!series || series === 'Cup') return null;
@@ -45,8 +26,7 @@ export default function TeamScreen({ state, me, onNav }) {
   const myPicks = (draftState?.picks || []).filter(p => p.playerId === me.id);
   const myCupDrivers = useMemo(() => {
     const wkExtras = (state.weekDriversExtra || {})[currentWeek] || [];
-    const pool = [...DEFAULT_DRIVERS, ...wkExtras];
-    return makeDriverWeekData(pool, currentWeek * 100 + pool.length);
+    return [...DEFAULT_DRIVERS, ...wkExtras];
   }, [state.weekDriversExtra, currentWeek]);
 
   const myPicksBySeries = {};
@@ -57,7 +37,7 @@ export default function TeamScreen({ state, me, onNav }) {
       const d = myCupDrivers.find(x => x.num === pk.driverNum);
       if (d) myPicksBySeries[series].push(d);
     } else {
-      const d = resolveDriver(state, currentWeek, pk);
+      const d = resolvePickDriver(state, currentWeek, pk);
       myPicksBySeries[series].push(d);
     }
   });
@@ -149,7 +129,7 @@ export default function TeamScreen({ state, me, onNav }) {
             </button>
             {isExp && <div style={{ padding:'4px 0 14px', display:'flex', gap:6, flexWrap:'wrap' }}>
               {r.picks.map((pk, pi) => {
-                const d = resolveDriver(state, r.wk, pk);
+                const d = resolvePickDriver(state, r.wk, pk);
                 const series = pk.series || 'Cup';
                 return <div key={`${series}:${pk.driverNum}:${pi}`} style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 12px', background: T.card, border:`0.5px solid ${T.line2}`, borderRadius:4 }}>
                   <CarNum driver={d} size={28}

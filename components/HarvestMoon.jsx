@@ -12,6 +12,7 @@ import {
 } from '@/lib/utils';
 import {
   AppFrame, TabBar, OnTheClockBanner, PullToRefresh, SaveBanner, YourTurnToast,
+  JustPickedToast,
 } from '@/components/ui/primitives';
 
 import HomeScreen          from '@/components/screens/HomeScreen';
@@ -133,7 +134,6 @@ export default function App() {
   const [pendingDriverNum, setPendingDriverNum] = useState(null);
 
   const contentRef = useRef(null);
-  const driversReturnRef = useRef('more');
   const lastTurnRef = useRef(null);
 
   const state = useMemo(() => migrateState(rawState), [rawState]);
@@ -170,27 +170,82 @@ export default function App() {
     lastTurnRef.current = sig;
   }, [myTurnInfo]);
 
-  // Navigation. Special-cases: 'draft' decides slot vs snake screen by phase;
-  // 'manage-drivers' tracks the originating screen so Back routes correctly
-  // (it can be opened from Draft to add a one-off driver mid-pick). The
-  // optional second arg carries a payload — currently { driverNum } when a
-  // CarNum chip elsewhere wants to open a specific driver's detail view.
-  const onNav = (id, payload) => {
-    if (payload?.driverNum != null) {
-      // Remember where the user came from so the detail's Back chip can
-      // dismiss back to it rather than the More menu fallback.
-      driversReturnRef.current = screen;
-      setPendingDriverNum(payload.driverNum);
-    }
+  // Just-picked toast for off-draft screens. When a new pick lands during an
+  // active draft and the user is NOT looking at the draft (they're on Home,
+  // Standings, etc.), surface a small bottom toast saying who picked what.
+  // The on-the-clock banner already says who's NEXT — this completes the
+  // story by showing what just happened. Auto-dismisses after 3s.
+  //
+  // We track picks length via a ref so we only fire when picks actually grow,
+  // not on every realtime echo. Picks shrinking (undo) silently resets the
+  // ref so the next legitimate add re-arms.
+  const prevPicksLenRef = useRef(0);
+  const [justPicked, setJustPicked] = useState(null); // { pick, player, driver } | null
+  useEffect(() => {
+    const picks = state?.draftState?.picks || [];
+    const prevLen = prevPicksLenRef.current;
+    prevPicksLenRef.current = picks.length;
+    if (picks.length <= prevLen) return; // shrinkage or no change
+    if (!state) return;
+    const newest = picks[picks.length - 1];
+    if (!newest) return;
+    // Don't spam ourselves with toasts about our own picks — we made them,
+    // we already saw them confirm.
+    if (me && newest.playerId === me.id) return;
+    const player = state.players.find(p => p.id === newest.playerId);
+    if (!player) return;
+    const driver = (() => {
+      const series = newest.series || 'Cup';
+      if (series === 'Cup') {
+        const wkExtras = (state.weekDriversExtra || {})[state.currentWeek] || [];
+        const cup = [...DEFAULT_DRIVERS, ...wkExtras];
+        return cup.find(d => d.num === newest.driverNum) || { num: newest.driverNum, name: newest.driverName || `#${newest.driverNum}` };
+      }
+      const pool = state.bonusDriversByWeek?.[state.currentWeek]?.[series] || [];
+      return pool.find(d => d.num === newest.driverNum) || { num: newest.driverNum, name: newest.driverName || `#${newest.driverNum}` };
+    })();
+    setJustPicked({ pick: newest, player, driver });
+  }, [state?.draftState?.picks?.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Navigation history stack. Every meaningful screen change pushes the
+  // PREVIOUS screen onto historyRef so Back behaves like a real browser/iOS
+  // back: returns to where the user actually was, not to a hardcoded parent.
+  // Tab switches also push, so backing out of a sub-screen via the tab bar
+  // still leaves the prior tab on the stack.
+  //
+  // Special id 'back' triggers goBack() — used by every BackChip in the app
+  // so screens don't have to know their own parent. Identical-target navs
+  // (re-tap of the current screen) are no-ops and don't double-stack.
+  const historyRef = useRef([]);
+  const goBack = () => {
+    setPendingDriverNum(null); // never carry deep-link state across back
+    const prev = historyRef.current.pop();
+    setScreen(prev || 'home');
+  };
+  // Resolve a logical id (potentially with phase-aware routing) to the
+  // concrete screen we want to land on. Pulled out so onNav and any
+  // bypass paths can use the same translation.
+  const resolveTarget = (id) => {
     if (id === 'draft') {
       const phase = state?.draftState?.phase;
-      setScreen(phase === 'slot-pick' || phase === 'ready' ? 'slot' : 'draft');
-    } else if (id === 'manage-drivers') {
-      driversReturnRef.current = (screen === 'draft' || screen === 'slot') ? 'draft' : 'more';
-      setScreen('manage-drivers');
-    } else {
-      setScreen(id);
+      return (phase === 'slot-pick' || phase === 'ready') ? 'slot' : 'draft';
     }
+    return id;
+  };
+  // Special-cases: 'back' pops history; 'draft' decides slot vs snake by
+  // phase; payload.driverNum routes to the analytical Drivers screen with a
+  // specific driver pre-opened. The driversReturnRef + driver-detail special
+  // cases are GONE — history handles all of it now.
+  const onNav = (id, payload) => {
+    if (id === 'back') { goBack(); return; }
+    if (payload?.driverNum != null) {
+      setPendingDriverNum(payload.driverNum);
+    }
+    const target = resolveTarget(id);
+    if (target === screen) return; // re-tap same screen — no-op, don't double-stack
+    historyRef.current.push(screen);
+    if (historyRef.current.length > 30) historyRef.current.shift(); // bound memory
+    setScreen(target);
   };
 
   const activeTab = SCREEN_TO_TAB[screen] || 'home';
@@ -203,6 +258,7 @@ export default function App() {
       draftHistory: [],
       draftState: { phase:'slot-pick', slotPickIdx:0, slotAssign:{}, currentRound:1, picks:[] },
     }));
+    historyRef.current = [];
     setScreen('home');
   };
 
@@ -222,11 +278,68 @@ export default function App() {
   // ─── Loading + login gates ──────────────────────────
 
   if (loading) {
-    return <div style={{
-      minHeight:'100vh', background: T.bg,
-      display:'flex', alignItems:'center', justifyContent:'center',
-      fontFamily: FI, fontStyle:'italic', fontSize:16, color: T.mute,
-    }}>{banner}Loading league…</div>;
+    // Skeleton mirrors the Home screen layout (top bar, dark hero card,
+    // three leaderboard rows) so when the real content arrives the layout
+    // doesn't shift. The shimmer is a slow opacity pulse — easier on the
+    // eyes than a sliding gradient and works on the cream bg without
+    // looking like marketing-page polish.
+    const shimmer = { animation: 'hm-shimmer 1.4s ease-in-out infinite' };
+    const skBlock = (w, h, radius = 4, extra = {}) => ({
+      width: w, height: h, borderRadius: radius,
+      background: 'rgba(20,17,13,0.10)',
+      ...shimmer, ...extra,
+    });
+    return <AppFrame>
+      {banner}
+      <div style={{ flex:1, overflowY:'auto', background: T.bg }}>
+        {/* Top bar shape */}
+        <div style={{
+          paddingTop:'max(18px, calc(env(safe-area-inset-top) + 8px))',
+          paddingLeft:20, paddingRight:20, paddingBottom:20,
+          display:'flex', alignItems:'flex-end', justifyContent:'space-between', gap:12,
+        }}>
+          <div style={{ flex:1 }}>
+            <div style={skBlock(120, 11, 2)}/>
+            <div style={{ ...skBlock(180, 28, 4), marginTop:8, background:'rgba(20,17,13,0.16)' }}/>
+          </div>
+          <div style={skBlock(36, 36, 18)}/>
+        </div>
+        {/* Hero card shape — dark, like Home's race hero */}
+        <div style={{ padding:'0 20px 16px' }}>
+          <div style={{
+            background: T.ink, borderRadius:4, padding:'22px 20px',
+          }}>
+            <div style={{ ...skBlock(80, 9, 2), background:'rgba(247,244,237,0.14)' }}/>
+            <div style={{ ...skBlock(220, 36, 4), marginTop:10, background:'rgba(247,244,237,0.18)' }}/>
+            <div style={{ ...skBlock(140, 12, 2), marginTop:12, background:'rgba(247,244,237,0.10)' }}/>
+            <div style={{ ...skBlock(180, 12, 2), marginTop:6, background:'rgba(247,244,237,0.08)' }}/>
+          </div>
+        </div>
+        {/* Three leaderboard rows */}
+        <div style={{ padding:'0 20px 8px' }}>
+          <div style={skBlock(100, 9, 2)}/>
+        </div>
+        <div style={{ padding:'14px 20px 20px' }}>
+          {[0,1,2].map(i => <div key={i} style={{
+            padding:'14px 0',
+            borderBottom: i === 2 ? 'none' : `0.5px solid ${T.line2}`,
+            display:'flex', alignItems:'center', gap:14,
+          }}>
+            <div style={skBlock(20, 16, 2)}/>
+            <div style={skBlock(26, 26, 13)}/>
+            <div style={{ flex:1 }}>
+              <div style={skBlock(110, 18, 3)}/>
+            </div>
+            <div style={skBlock(56, 14, 2)}/>
+          </div>)}
+        </div>
+        <div style={{
+          padding:'18px 20px', textAlign:'center',
+          fontFamily: FI, fontStyle:'italic', fontSize:12, color: T.mute,
+          ...shimmer,
+        }}>Loading league…</div>
+      </div>
+    </AppFrame>;
   }
 
   if (!me) {
@@ -246,25 +359,17 @@ export default function App() {
     slot:            <SlotPickScreen      state={state} setState={setState} me={me} onNav={onNav}/>,
     draft:           <DraftScreen         state={state} setState={setState} me={me} onNav={onNav}/>,
     'enter-results': <EnterResultsScreen  state={state} setState={setState} me={me} onNav={onNav}/>,
-    'edit-results':  <EnterResultsScreen  state={state} setState={setState} me={me} onNav={(id) => { setEditingWeek(null); onNav(id); }} editWeek={editingWeek}/>,
+    'edit-results':  <EnterResultsScreen  state={state} setState={setState} me={me} onNav={(id, p) => { if (id === 'back') setEditingWeek(null); onNav(id, p); }} editWeek={editingWeek}/>,
     standings:       <StandingsScreen     state={state} me={me} onNav={onNav}/>,
     team:            <TeamScreen          state={state} me={me} onNav={onNav}/>,
     recap:           <RecapScreen         state={state} onNav={onNav}/>,
-    more:            <MoreScreen          state={state} me={me} setScreen={setScreen} onReset={resetSeason} onSignOut={() => setMeId(null)}/>,
-    profile:         <ProfileScreen       state={state} setState={setState} me={me} onBack={() => setScreen('home')}/>,
-    schedule:        <ScheduleScreen      state={state} onNav={onNav} onBack={() => setScreen('more')}/>,
-    history:         <HistoryScreen       state={state} me={me} onBack={() => setScreen('more')} onNav={onNav} onEdit={(wk) => { setEditingWeek(wk); setScreen('edit-results'); }}/>,
-    rules:           <RulesScreen         state={state} onBack={() => setScreen('more')}/>,
-    drivers:         <DriversScreen       state={state} me={me} initialNum={pendingDriverNum} onConsumeInitial={() => setPendingDriverNum(null)} onBack={() => {
-      setPendingDriverNum(null);
-      const ret = driversReturnRef.current;
-      // Send the user back where they came from. Default to More for the
-      // bottom-nav entry point. Recognized return surfaces are anywhere a
-      // CarNum chip can be tapped from.
-      const knownReturns = ['home','team','recap','history','enter-results','edit-results','schedule','more'];
-      setScreen(knownReturns.includes(ret) ? ret : 'more');
-    }}/>,
-    'manage-drivers':<ManageDriversScreen state={state} setState={setState} me={me} onBack={() => onNav(driversReturnRef.current === 'draft' ? 'draft' : 'more')}/>,
+    more:            <MoreScreen          state={state} me={me} onNav={onNav} onReset={resetSeason} onSignOut={() => setMeId(null)}/>,
+    profile:         <ProfileScreen       state={state} setState={setState} me={me} saveStatus={saveStatus} onBack={() => onNav('back')}/>,
+    schedule:        <ScheduleScreen      state={state} onNav={onNav} onBack={() => onNav('back')}/>,
+    history:         <HistoryScreen       state={state} me={me} onBack={() => onNav('back')} onNav={onNav} onEdit={(wk) => { setEditingWeek(wk); onNav('edit-results'); }}/>,
+    rules:           <RulesScreen         state={state} onBack={() => onNav('back')}/>,
+    drivers:         <DriversScreen       state={state} me={me} initialNum={pendingDriverNum} onConsumeInitial={() => setPendingDriverNum(null)} onBack={() => onNav('back')}/>,
+    'manage-drivers':<ManageDriversScreen state={state} setState={setState} me={me} onBack={() => onNav('back')}/>,
   };
 
   return <AppFrame>
@@ -281,5 +386,11 @@ export default function App() {
       {screens[screen]}
     </PullToRefresh>
     <TabBar active={activeTab} onNav={onNav}/>
+    {justPicked && !onDraftScreen && <JustPickedToast
+      player={justPicked.player}
+      driver={justPicked.driver}
+      onTap={() => { setJustPicked(null); onNav('draft'); }}
+      onDismiss={() => setJustPicked(null)}
+    />}
   </AppFrame>;
 }

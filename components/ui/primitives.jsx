@@ -58,6 +58,47 @@ export function SectionLabel({ children, right, style = {} }) {
   </div>;
 }
 
+// ── CTA tier system ──────────────────────────────────────────────
+// The app inherited five distinct button treatments that didn't reliably
+// encode meaning: solid dark, solid copper, italic-serif arrow, underlined
+// text, outline-on-dark. Users couldn't tell from style alone whether a
+// thing was a primary action or a piece of metadata. The tiers below are
+// the canonical contract going forward:
+//
+//   Primary    — the most consequential action on a screen. Solid T.ink
+//                background with T.bg text. Used for Sign In, Save &
+//                Advance, Done, etc. Already applied bespoke at most
+//                sites; we don't sweep them in one go.
+//   Secondary  — an important alternative or supporting action. Outline
+//                style: transparent bg, T.line border, T.ink text. Used
+//                for Cancel buttons, "← Back" exits.
+//   Tertiary   — inline navigation between related screens, "see more"
+//                affordances. Use the LinkArrow primitive below — a real
+//                button (focusable, keyboard-accessible) rendered as a
+//                small text+chevron link.
+//   Destructive — used only for confirm-destruction actions. Solid red
+//                (#C8102E). Currently only the Reset Season modal.
+//
+// LinkArrow normalizes the "View →" / "All →" / "Manage →" pattern that
+// previously existed as raw <span onClick> elements (not focusable, not
+// announced as buttons by screen readers). Rendering a real <button>
+// with consistent affordance fixes the a11y issue and gives the app one
+// place to tune the tertiary CTA look.
+export function LinkArrow({ onClick, children, tone = 'light' }) {
+  const color = tone === 'dark' ? T.bg : T.ink;
+  return <button onClick={onClick} style={{
+    appearance:'none', background:'transparent', border:'none', padding:'2px 4px',
+    margin:'-2px -4px', // negative margin keeps optical alignment with the section label
+    cursor:'pointer', color,
+    fontFamily: FI, fontStyle:'italic', fontSize:13,
+    letterSpacing:'0.01em', textTransform:'none',
+    display:'inline-flex', alignItems:'center', gap:4,
+  }}>
+    {children}
+    <span aria-hidden style={{ fontSize:14, lineHeight:1, transform:'translateY(-1px)' }}>→</span>
+  </button>;
+}
+
 export function TopBar({ title, subtitle, right, style = {} }) {
   return <div style={{
     paddingTop:'max(18px, calc(env(safe-area-inset-top) + 8px))',
@@ -289,6 +330,72 @@ export function AppFrame({ children }) {
 }
 
 // ─── BANNERS / TOASTS ────────────────────────────────────────────
+
+// Bottom-anchored toast that surfaces a just-completed pick when the user
+// is NOT on the draft screen (so they don't miss the moment something
+// happened). Slides up from below the tab bar, sits for ~3s, slides back
+// down. Tap to jump to the draft. Auto-dismisses via parent-controlled
+// onDismiss after the timer.
+//
+// The on-the-clock banner already says who's NEXT — this toast completes
+// the story by telling the league what just LANDED ("Trey took #5 Larson").
+// Together: who-just-acted + who-acts-next = full picture without the user
+// needing to be on the draft screen.
+export function JustPickedToast({ player, driver, onTap, onDismiss }) {
+  const [exiting, setExiting] = useState(false);
+  // Auto-fade ~2.6s after mount so the slide-out animation gets to play in
+  // the remaining 400ms before parent removes us. The keyed `player+driver`
+  // effect ensures rapid back-to-back picks each get their own full timer.
+  useEffect(() => {
+    const exitTimer = setTimeout(() => setExiting(true), 2600);
+    const removeTimer = setTimeout(() => onDismiss?.(), 3000);
+    return () => { clearTimeout(exitTimer); clearTimeout(removeTimer); };
+  }, [player?.id, driver?.num, onDismiss]);
+
+  if (!player || !driver) return null;
+
+  return <button
+    onClick={() => { onTap?.(); }}
+    style={{
+      position:'fixed',
+      // Sit just above the tab bar (which ends ~70-90px from bottom on iOS
+      // with safe-area). Using calc keeps us clear of the home indicator.
+      bottom:'calc(76px + env(safe-area-inset-bottom))',
+      left:16, right:16,
+      zIndex:50,
+      appearance:'none', cursor:'pointer', textAlign:'left',
+      background:'linear-gradient(180deg, #1c1a16 0%, #14110D 100%)',
+      color: T.bg,
+      border:'1px solid rgba(184,147,90,0.3)',
+      borderRadius:8, padding:'12px 14px',
+      boxShadow:'0 12px 32px rgba(0,0,0,0.45), inset 0 1px 0 rgba(247,244,237,0.06)',
+      display:'flex', alignItems:'center', gap:12,
+      animation: exiting
+        ? 'hm-toastfall 320ms cubic-bezier(0.4,0,1,1) forwards'
+        : 'hm-toastrise 280ms cubic-bezier(0.32,0.72,0,1) both',
+    }}
+  >
+    <PlayerBadge player={player} size={28}/>
+    <div style={{ flex:1, minWidth:0 }}>
+      <div style={{
+        fontFamily: FL, fontSize:8, fontWeight:600,
+        letterSpacing:'0.26em', textTransform:'uppercase',
+        color:'rgba(247,244,237,0.55)',
+      }}>Just Picked</div>
+      <div style={{
+        fontFamily: FB, fontSize:13, fontWeight:500, marginTop:2,
+        whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis',
+      }}>
+        <span style={{ fontWeight:700 }}>{player.name}</span> took #{driver.num} {driver.name}
+      </div>
+    </div>
+    <span style={{
+      fontFamily: FL, fontSize:9, fontWeight:600,
+      letterSpacing:'0.22em', textTransform:'uppercase',
+      color: T.hot, flexShrink:0,
+    }}>View →</span>
+  </button>;
+}
 
 export function YourTurnToast({ kind, onGo }) {
   return <button onClick={onGo} style={{
@@ -543,9 +650,11 @@ export function SaveBanner({ status, error, onRetry }) {
       fontFamily: FL, fontSize:9, fontWeight:500,
       letterSpacing:'0.18em', textTransform:'uppercase', flexShrink:0,
     }}>Retry</button>
-    <button onClick={() => setDismissed(true)} style={{
+    <button onClick={() => setDismissed(true)} aria-label="Dismiss" style={{
       appearance:'none', background:'transparent', border:'none', color:'rgba(255,255,255,0.7)',
-      padding:'4px 6px', cursor:'pointer', fontSize:18, lineHeight:1, flexShrink:0,
+      cursor:'pointer', fontSize:18, lineHeight:1, flexShrink:0,
+      // 44pt minimum hit area for iOS — wraps the small × glyph.
+      width:44, height:44, display:'flex', alignItems:'center', justifyContent:'center',
     }}>×</button>
   </div>;
 }

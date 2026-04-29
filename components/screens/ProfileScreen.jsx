@@ -1,11 +1,44 @@
 'use client';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { BackChip, CarNum, Field, MenuRow, PlayerBadge, SectionLabel, TopBar, WinsCount } from '@/components/ui/primitives';
 import { ADMIN_ID, FB, FD, FI, FL, T } from '@/lib/constants';
 import { DEFAULT_DRIVERS } from '@/lib/data';
 import { computeStandings } from '@/lib/utils';
 
-export default function ProfileScreen({ state, setState, me, onBack }) {
+// Tiny status pill rendered next to the Back chip on Profile. Mirrors the
+// useLeague saveStatus state machine: 'idle' shows nothing, 'saving' shows
+// a muted "Saving…" italic line, 'ok' briefly flashes "Saved ✓" in green,
+// 'error' is already handled by the global SaveBanner so we stay quiet.
+//
+// We hold the 'ok' state visible for a beat after the status returns to
+// 'idle' so the user actually sees the confirmation rather than a flash
+// they might miss. Without this, fast typers would never see the ✓.
+function SaveStatusPill({ status }) {
+  const [visible, setVisible] = useState(null); // 'saving' | 'ok' | null
+  useEffect(() => {
+    if (status === 'saving') { setVisible('saving'); return; }
+    if (status === 'ok' && visible === 'saving') {
+      setVisible('ok');
+      const t = setTimeout(() => setVisible(null), 1400);
+      return () => clearTimeout(t);
+    }
+    if (status === 'idle' && visible !== 'ok') setVisible(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]);
+  if (!visible) return null;
+  const isOk = visible === 'ok';
+  return <span style={{
+    display:'inline-flex', alignItems:'center', gap:5,
+    padding:'4px 8px', borderRadius:3,
+    background: isOk ? 'rgba(90,122,94,0.12)' : 'rgba(20,17,13,0.04)',
+    color: isOk ? T.good : T.mute,
+    fontFamily: FL, fontSize:9, fontWeight:600,
+    letterSpacing:'0.22em', textTransform:'uppercase',
+    transition:'background 200ms ease, color 200ms ease',
+  }}>{isOk ? '✓ Saved' : 'Saving…'}</span>;
+}
+
+export default function ProfileScreen({ state, setState, me, onBack, saveStatus }) {
   const isAdmin = me.id === ADMIN_ID;
   const update = (field, val) => {
     if (isAdmin) return;
@@ -41,7 +74,10 @@ export default function ProfileScreen({ state, setState, me, onBack }) {
   }
 
   return <div style={{ paddingBottom:20 }}>
-    <TopBar subtitle="Your identity in the league" title="Profile" right={<BackChip onClick={onBack}/>}/>
+    <TopBar subtitle="Your identity in the league" title="Profile" right={<div style={{ display:'inline-flex', alignItems:'center', gap:8 }}>
+      <SaveStatusPill status={saveStatus}/>
+      <BackChip onClick={onBack}/>
+    </div>}/>
 
     {/* Hero */}
     <div style={{ padding:'0 20px 20px' }}>

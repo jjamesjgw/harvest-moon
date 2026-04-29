@@ -1,6 +1,6 @@
 'use client';
 import React from 'react';
-import { PlayerBadge, RaceCountdown, SectionLabel, TopBar, WinsCount } from '@/components/ui/primitives';
+import { LinkArrow, PlayerBadge, RaceCountdown, SectionLabel, TopBar, WinsCount } from '@/components/ui/primitives';
 import { InstallHint } from '@/components/ui/InstallHint';
 import { ADMIN_ID, FB, FD, FI, FL, T } from '@/lib/constants';
 import { computeStandings, getWeekConfig, ordinalSuffix, raceCountdown } from '@/lib/utils';
@@ -181,16 +181,12 @@ export default function HomeScreen({ state, me, onNav }) {
               : `−${(sorted[0].seasonPts - meStanding.seasonPts).toLocaleString()} back of ${sorted[0].name}`}
           </div>
         </div>
-        <button onClick={() => onNav('standings')} style={{
-          appearance:'none', border:'none', background:'transparent',
-          padding:0, cursor:'pointer', color: T.ink,
-          fontFamily: FI, fontStyle:'italic', fontSize:14,
-        }}>View →</button>
+        <LinkArrow onClick={() => onNav('standings')}>View</LinkArrow>
       </div>
     </div>
 
     {/* Leaderboard top 3 */}
-    <SectionLabel right={<span onClick={() => onNav('standings')} style={{ cursor:'pointer', fontFamily: FI, fontStyle:'italic', fontSize:12, letterSpacing:'0.01em', textTransform:'none', color: T.ink }}>All →</span>}>Leaderboard</SectionLabel>
+    <SectionLabel right={<LinkArrow onClick={() => onNav('standings')}>All</LinkArrow>}>Leaderboard</SectionLabel>
     <div style={{ padding:'14px 20px 20px' }}>
       {weeklyResults.length === 0 ? (
         <div style={{ padding:'18px 0', fontFamily: FI, fontStyle:'italic', fontSize:13, color: T.mute, lineHeight:1.5 }}>

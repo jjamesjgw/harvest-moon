@@ -51,9 +51,14 @@ export function InstallHint() {
       boxShadow:'0 1px 3px rgba(20,17,13,0.04)',
     }}>
       <button onClick={dismiss} aria-label="Dismiss" style={{
-        position:'absolute', top:6, right:8,
+        position:'absolute', top:0, right:0,
         appearance:'none', background:'transparent', border:'none',
-        color: T.mute, fontSize:18, cursor:'pointer', lineHeight:1, padding:'4px 6px',
+        color: T.mute, fontSize:18, cursor:'pointer', lineHeight:1,
+        // 44×44 minimum hit area per iOS HIG. The visible × stays small via
+        // padding rather than scaling up the glyph itself.
+        width:44, height:44,
+        display:'flex', alignItems:'center', justifyContent:'center',
+        paddingTop:6, paddingRight:8,
       }}>×</button>
       <div style={{
         fontFamily: FL, fontSize:9, fontWeight:600,
