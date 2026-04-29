@@ -1,3 +1,5 @@
+import { SpeedInsights } from '@vercel/speed-insights/next';
+
 export const metadata = {
   title: 'Harvest Moon',
   description: 'NASCAR Fantasy League',
@@ -24,7 +26,10 @@ export default function RootLayout({ children }) {
       <head>
         <link rel="apple-touch-icon" href="/icon-192.png" />
       </head>
-      <body style={{ margin: 0, background: '#0a0806' }}>{children}</body>
+      <body style={{ margin: 0, background: '#0a0806' }}>
+        {children}
+        <SpeedInsights />
+      </body>
     </html>
   );
 }
