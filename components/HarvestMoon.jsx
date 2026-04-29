@@ -126,6 +126,11 @@ export default function App() {
     } catch {}
   };
   const [editingWeek, setEditingWeek] = useState(null); // wk number when admin is editing a past week
+  // When a CarNum chip is tapped anywhere in the app, we route to 'drivers'
+  // and stash the target driver number here so DriversScreen can open the
+  // detail view directly. The screen clears it on first read so subsequent
+  // navigations don't reopen the same driver.
+  const [pendingDriverNum, setPendingDriverNum] = useState(null);
 
   const contentRef = useRef(null);
   const driversReturnRef = useRef('more');
@@ -167,8 +172,16 @@ export default function App() {
 
   // Navigation. Special-cases: 'draft' decides slot vs snake screen by phase;
   // 'manage-drivers' tracks the originating screen so Back routes correctly
-  // (it can be opened from Draft to add a one-off driver mid-pick).
-  const onNav = (id) => {
+  // (it can be opened from Draft to add a one-off driver mid-pick). The
+  // optional second arg carries a payload — currently { driverNum } when a
+  // CarNum chip elsewhere wants to open a specific driver's detail view.
+  const onNav = (id, payload) => {
+    if (payload?.driverNum != null) {
+      // Remember where the user came from so the detail's Back chip can
+      // dismiss back to it rather than the More menu fallback.
+      driversReturnRef.current = screen;
+      setPendingDriverNum(payload.driverNum);
+    }
     if (id === 'draft') {
       const phase = state?.draftState?.phase;
       setScreen(phase === 'slot-pick' || phase === 'ready' ? 'slot' : 'draft');
@@ -239,10 +252,18 @@ export default function App() {
     recap:           <RecapScreen         state={state} onNav={onNav}/>,
     more:            <MoreScreen          state={state} me={me} setScreen={setScreen} onReset={resetSeason} onSignOut={() => setMeId(null)}/>,
     profile:         <ProfileScreen       state={state} setState={setState} me={me} onBack={() => setScreen('home')}/>,
-    schedule:        <ScheduleScreen      state={state} onBack={() => setScreen('more')}/>,
-    history:         <HistoryScreen       state={state} me={me} onBack={() => setScreen('more')} onEdit={(wk) => { setEditingWeek(wk); setScreen('edit-results'); }}/>,
+    schedule:        <ScheduleScreen      state={state} onNav={onNav} onBack={() => setScreen('more')}/>,
+    history:         <HistoryScreen       state={state} me={me} onBack={() => setScreen('more')} onNav={onNav} onEdit={(wk) => { setEditingWeek(wk); setScreen('edit-results'); }}/>,
     rules:           <RulesScreen         state={state} onBack={() => setScreen('more')}/>,
-    drivers:         <DriversScreen       state={state} me={me} onBack={() => setScreen('more')}/>,
+    drivers:         <DriversScreen       state={state} me={me} initialNum={pendingDriverNum} onConsumeInitial={() => setPendingDriverNum(null)} onBack={() => {
+      setPendingDriverNum(null);
+      const ret = driversReturnRef.current;
+      // Send the user back where they came from. Default to More for the
+      // bottom-nav entry point. Recognized return surfaces are anywhere a
+      // CarNum chip can be tapped from.
+      const knownReturns = ['home','team','recap','history','enter-results','edit-results','schedule','more'];
+      setScreen(knownReturns.includes(ret) ? ret : 'more');
+    }}/>,
     'manage-drivers':<ManageDriversScreen state={state} setState={setState} me={me} onBack={() => onNav(driversReturnRef.current === 'draft' ? 'draft' : 'more')}/>,
   };
 

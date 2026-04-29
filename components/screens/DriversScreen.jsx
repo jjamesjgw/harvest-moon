@@ -1,5 +1,5 @@
 'use client';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { BackChip, CarNum, PlayerBadge, SectionLabel, TopBar } from '@/components/ui/primitives';
 import { FB, FD, FI, FL, FM, T } from '@/lib/constants';
 import { computeAllDriverStats } from '@/lib/utils';
@@ -17,11 +17,25 @@ const SORTS = [
   { id: 'best',  label: 'Best Wk',  key: 'bestWeekPts', sort: (a,b) => (b.bestWeek?.pts||0) - (a.bestWeek?.pts||0), fmt: r => r.bestWeek?.pts || 0 },
 ];
 
-export default function DriversScreen({ state, me, onBack }) {
+export default function DriversScreen({ state, me, onBack, initialNum, onConsumeInitial }) {
   const all = useMemo(() => computeAllDriverStats(state), [state]);
   const [scope, setScope] = useState('league'); // 'league' | 'mine'
   const [sortId, setSortId] = useState('total');
-  const [openNum, setOpenNum] = useState(null); // when set, render detail view
+  const [openNum, setOpenNum] = useState(initialNum ?? null); // when set, render detail view
+
+  // Honor a deep-link from elsewhere in the app: if we mounted with an
+  // initialNum (because a CarNum chip was tapped on Recap, Team, etc.),
+  // open that driver's detail view and clear the pending value so a
+  // subsequent navigation away and back doesn't re-open the same driver.
+  useEffect(() => {
+    if (initialNum != null) {
+      setOpenNum(initialNum);
+      onConsumeInitial?.();
+    }
+    // We only consume on mount; later changes to initialNum from the parent
+    // would be unusual but we still want to honor them.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialNum]);
 
   // Filter drivers by scope. "Mine" = drivers I've personally drafted at any point.
   const myIds = new Set(

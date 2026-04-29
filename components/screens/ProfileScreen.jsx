@@ -109,13 +109,16 @@ export default function ProfileScreen({ state, setState, me, onBack }) {
       </div>
     </div>
 
+    <div style={{ padding:'0 20px 8px', fontFamily: FI, fontStyle:'italic', fontSize:11, color: T.mute, textAlign:'center', lineHeight:1.5 }}>
+      Changes save automatically as you type.
+    </div>
     <div style={{ padding:'0 20px 24px' }}>
       <button onClick={onBack} style={{
         appearance:'none', width:'100%', padding:16,
         background: T.ink, color: T.bg, border:'none', borderRadius:3, cursor:'pointer',
         fontFamily: FL, fontSize:11, fontWeight:500,
         letterSpacing:'0.24em', textTransform:'uppercase',
-      }}>Save</button>
+      }}>Done</button>
     </div>
   </div>;
 }

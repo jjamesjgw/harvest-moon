@@ -218,7 +218,8 @@ export default function EnterResultsScreen({ state, setState, me, onNav, editWee
               padding:'12px 0',
               borderBottom: i === list.length-1 ? 'none' : `0.5px solid ${T.line2}`,
             }}>
-              <CarNum driver={d} size={34}/>
+              <CarNum driver={d} size={34}
+                onClick={series === 'Cup' ? () => onNav('drivers', { driverNum: d.num }) : undefined}/>
               <div style={{ flex:1, minWidth:0 }}>
                 <div style={{ fontFamily: FD, fontSize:16, fontWeight:600, letterSpacing:'-0.03em', lineHeight:1.1 }}>{d.name}</div>
                 <div style={{ display:'flex', alignItems:'center', gap:4, marginTop:4, flexWrap:'wrap' }}>

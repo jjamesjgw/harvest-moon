@@ -1,5 +1,5 @@
 'use client';
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { BackChip, CarNum, PlayerBadge, SectionLabel, TopBar } from '@/components/ui/primitives';
 import { FB, FD, FI, FL, ROUNDS_PER_WEEK, SERIES, T } from '@/lib/constants';
 import { DEFAULT_DRIVERS } from '@/lib/data';
@@ -39,6 +39,48 @@ export default function DraftScreen({ state, setState, me, onNav }) {
     const all = computeAllDriverStats(state);
     return new Map(all.drivers.map(d => [d.num, d]));
   }, [state]);
+
+  // Freshly-arrived picks. Whenever the picks array grows (whether from
+  // realtime push or local action), the new entries get added to a Set
+  // and rendered with a transient ring + tag-slide animation. Cleared
+  // ~1.2s later. Undo (picks shrinks) doesn't trigger animations and
+  // should reset our seen-set so a re-pick of the same driver after undo
+  // will animate again. Keys are series+num so bonus and Cup picks of
+  // the same number stay distinct.
+  const seenPicksRef = useRef(new Set());
+  const [freshPickKeys, setFreshPickKeys] = useState(() => new Set());
+  useEffect(() => {
+    const currentKeys = new Set(
+      (draftState.picks || []).map(p => pickKey(p.series || 'Cup', p.driverNum))
+    );
+    // If picks shrank (undo) or reset, drop seen-keys that no longer exist
+    // so they can re-animate when re-picked.
+    seenPicksRef.current.forEach(k => {
+      if (!currentKeys.has(k)) seenPicksRef.current.delete(k);
+    });
+    // Find newcomers.
+    const newKeys = [];
+    currentKeys.forEach(k => {
+      if (!seenPicksRef.current.has(k)) {
+        seenPicksRef.current.add(k);
+        newKeys.push(k);
+      }
+    });
+    if (newKeys.length === 0) return;
+    setFreshPickKeys(prev => {
+      const next = new Set(prev);
+      newKeys.forEach(k => next.add(k));
+      return next;
+    });
+    const t = setTimeout(() => {
+      setFreshPickKeys(prev => {
+        const next = new Set(prev);
+        newKeys.forEach(k => next.delete(k));
+        return next;
+      });
+    }, 1200);
+    return () => clearTimeout(t);
+  }, [draftState.picks]);
 
   const resetDraft = () => {
     if (!resetArm) { setResetArm(true); setTimeout(() => setResetArm(false), 3000); return; }
@@ -208,6 +250,7 @@ export default function DraftScreen({ state, setState, me, onNav }) {
       isAdmin={isAdmin}
       onAddDriver={() => onNav('manage-drivers')}
       driverStats={driverStats}
+      freshPickKeys={freshPickKeys}
     />}
     {!done && activeSeries === 'Cup' && isAdmin && <div style={{ padding:'0 20px 24px' }}>
       <button onClick={() => onNav('manage-drivers')} style={{
@@ -297,7 +340,7 @@ function SeriesTabs({ cfg, picks, pickerId, active, onSelect, bonusPools }) {
 }
 
 // ── Driver pool grid ───────────────────────────────────────────────
-function DraftGrid({ drivers, pickedKeys, activeSeries, draftState, players, onPick, remaining, isEmpty, isAdmin, onAddDriver, driverStats }) {
+function DraftGrid({ drivers, pickedKeys, activeSeries, draftState, players, onPick, remaining, isEmpty, isAdmin, onAddDriver, driverStats, freshPickKeys }) {
   if (isEmpty) {
     const meta = SERIES[activeSeries] || { label: activeSeries };
     return <div style={{ padding:'24px 20px' }}>
@@ -334,6 +377,7 @@ function DraftGrid({ drivers, pickedKeys, activeSeries, draftState, players, onP
           const taken = pickedKeys.has(pickKey(activeSeries, d.num));
           const takenBy = taken ? draftState.picks.find(p => p.driverNum === d.num && (p.series || 'Cup') === activeSeries) : null;
           const takenPl = takenBy ? players.find(p => p.id === takenBy.playerId) : null;
+          const isFresh = taken && freshPickKeys?.has(pickKey(activeSeries, d.num));
           // Stats only meaningful for Cup picks (bonus pools are one-offs).
           // We hide stats on already-taken cards because the card is muted
           // and the user can't pick them anyway — keeping them readable
@@ -355,6 +399,11 @@ function DraftGrid({ drivers, pickedKeys, activeSeries, draftState, players, onP
               ? 'none'
               : 'inset 0 1px 0 rgba(255,255,255,0.85), 0 2px 6px rgba(20,17,13,0.06), 0 8px 18px rgba(20,17,13,0.05)',
             transition:'transform .12s ease',
+            // Pulse a copper ring around the card the instant it becomes
+            // taken — gives the league a peripheral cue when someone else's
+            // pick lands during shared drafting. Forwards fill so the
+            // shadow doesn't reset visibly when the animation ends.
+            animation: isFresh ? 'hm-pickring 900ms ease-out forwards' : 'none',
           }}>
             {!taken && <div style={{
               position:'absolute', top:0, left:0, right:0, height:3,
@@ -372,6 +421,9 @@ function DraftGrid({ drivers, pickedKeys, activeSeries, draftState, players, onP
               fontFamily: FL, fontWeight:700, fontSize:8,
               letterSpacing:'0.18em', textTransform:'uppercase',
               borderBottomLeftRadius:6,
+              // The tag slides in from the right edge on first appearance.
+              // After the 400ms run completes it stays in place.
+              animation: isFresh ? 'hm-tagslide 400ms cubic-bezier(0.32,0.72,0,1) both' : 'none',
             }}>{takenPl.name.slice(0,3)}</div>}
             <CarNum driver={d} size={48}/>
             <div style={{

@@ -184,8 +184,12 @@ export default function RecapScreen({ state, onNav }) {
                 {roster.map((pk, pi) => {
                   const d = resolveDriver(state, last.wk, pk);
                   const series = pk.series || 'Cup';
+                  // Only Cup chips are tappable — they have season-wide stats.
+                  // Bonus picks come from one-week pools, so opening "driver
+                  // detail" for them would either mismatch or be empty.
                   return <span key={`${series}:${pk.driverNum}:${pi}`} style={{ display:'inline-flex', alignItems:'center' }}>
-                    <CarNum driver={d} size={26}/>
+                    <CarNum driver={d} size={26}
+                      onClick={series === 'Cup' ? () => onNav('drivers', { driverNum: d.num }) : undefined}/>
                     <SeriesTag series={series}/>
                   </span>;
                 })}

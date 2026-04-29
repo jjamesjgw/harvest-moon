@@ -42,7 +42,7 @@ function SeriesTag({ series }) {
   }}>{meta.short}</span>;
 }
 
-export default function HistoryScreen({ state, me, onBack, onEdit }) {
+export default function HistoryScreen({ state, me, onBack, onEdit, onNav }) {
   const { players, schedule = [], weeklyResults, draftHistory = [] } = state;
   const [expanded, setExpanded] = useState(null);
   const isAdmin = me?.id === ADMIN_ID;
@@ -97,7 +97,8 @@ export default function HistoryScreen({ state, me, onBack, onEdit }) {
                         const d = resolvePickDriver(state, w.wk, pk);
                         const series = pk.series || 'Cup';
                         return <span key={`${series}:${pk.driverNum}:${pi}`} style={{ display:'inline-flex', alignItems:'center' }}>
-                          <CarNum driver={d} size={22}/>
+                          <CarNum driver={d} size={22}
+                            onClick={series === 'Cup' && onNav ? () => onNav('drivers', { driverNum: d.num }) : undefined}/>
                           <SeriesTag series={series}/>
                         </span>;
                       })}

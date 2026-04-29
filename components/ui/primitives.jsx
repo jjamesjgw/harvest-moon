@@ -15,8 +15,8 @@ export function Chip({ children, color, bg, style = {} }) {
   }}>{children}</span>;
 }
 
-export function CarNum({ driver, size = 38 }) {
-  return <div style={{
+export function CarNum({ driver, size = 38, onClick }) {
+  const baseStyle = {
     width:size, height:size, borderRadius:4,
     background: driver.primary, color: driver.secondary,
     display:'flex', alignItems:'center', justifyContent:'center',
@@ -24,7 +24,15 @@ export function CarNum({ driver, size = 38 }) {
     letterSpacing:'-0.02em', flexShrink:0,
     border: driver.primary === '#000000' ? '1px solid rgba(255,255,255,0.15)' : 'none',
     boxShadow:'0 1px 0 rgba(0,0,0,0.04)',
-  }}>{driver.num}</div>;
+  };
+  if (onClick) {
+    return <button
+      onClick={(e) => { e.stopPropagation(); onClick(driver); }}
+      style={{ ...baseStyle, appearance:'none', padding:0, cursor:'pointer' }}
+      aria-label={`Open ${driver.name || `#${driver.num}`} stats`}
+    >{driver.num}</button>;
+  }
+  return <div style={baseStyle}>{driver.num}</div>;
 }
 
 export function PlayerBadge({ player, size = 22, style = {} }) {

@@ -114,7 +114,8 @@ export default function TeamScreen({ state, me, onNav }) {
                 marginBottom:6,
               }}>{meta.label}</div>}
               <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                {list.map(d => <DriverRow key={`${series}:${d.num}`} driver={d}/>)}
+                {list.map(d => <DriverRow key={`${series}:${d.num}`} driver={d}
+                  onClick={series === 'Cup' ? () => onNav('drivers', { driverNum: d.num }) : undefined}/>)}
               </div>
             </div>;
           })}
@@ -151,7 +152,8 @@ export default function TeamScreen({ state, me, onNav }) {
                 const d = resolveDriver(state, r.wk, pk);
                 const series = pk.series || 'Cup';
                 return <div key={`${series}:${pk.driverNum}:${pi}`} style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 12px', background: T.card, border:`0.5px solid ${T.line2}`, borderRadius:4 }}>
-                  <CarNum driver={d} size={28}/>
+                  <CarNum driver={d} size={28}
+                    onClick={series === 'Cup' ? () => onNav('drivers', { driverNum: d.num }) : undefined}/>
                   <span style={{ fontFamily: FD, fontSize:13, fontWeight:600, letterSpacing:'-0.02em' }}>{d.name}</span>
                   <SeriesTag series={series}/>
                 </div>;
