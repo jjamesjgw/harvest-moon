@@ -1,8 +1,59 @@
 'use client';
-import React from 'react';
+import React, { useState } from 'react';
 import { BackChip, PlayerBadge, SectionLabel, TopBar, WinsCount } from '@/components/ui/primitives';
 import { FB, FD, FI, FL, T } from '@/lib/constants';
 import { computeStandings } from '@/lib/utils';
+
+// Builds a plain-text version of the standings suitable for pasting into the
+// league group chat. Aligned columns via padEnd. Includes weekly-wins count
+// for top-3 finishers (skipped for 0-win players to keep the line tight).
+//
+// Example output:
+//   🏁 Harvest Moon · Through Wk 10
+//   1. Justin    1,847 pts · 3W
+//   2. Tone      1,723 pts · 2W
+//   3. Boomer    1,654 pts · 1W
+//   4. Soup      1,489 pts
+//   5. Chad      1,432 pts
+//   6. Trey      1,278 pts
+function formatStandingsText(sorted, throughWeek) {
+  const nameWidth = Math.max(...sorted.map(p => p.name.length));
+  const lines = sorted.map((p, i) => {
+    const pad = p.name.padEnd(nameWidth, ' ');
+    const wins = p.wins > 0 ? ` · ${p.wins}W` : '';
+    return `${i + 1}. ${pad}  ${p.seasonPts.toLocaleString()} pts${wins}`;
+  });
+  return [
+    `🏁 Harvest Moon · Through Wk ${String(throughWeek).padStart(2, '0')}`,
+    ...lines,
+  ].join('\n');
+}
+
+// Best-effort clipboard write. Modern browsers expose navigator.clipboard;
+// older ones / non-secure contexts fall back to the textarea + execCommand
+// trick. Returns true on success, false otherwise so the UI can decide
+// whether to show "Copied" or surface an error.
+async function copyText(text) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {}
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    return ok;
+  } catch {
+    return false;
+  }
+}
 
 export default function StandingsScreen({ state, onNav }) {
   const { players, weeklyResults, currentWeek } = state;
@@ -11,11 +62,37 @@ export default function StandingsScreen({ state, onNav }) {
   const max = Math.max(1, ...sorted.map(s => s.seasonPts));
   const completedWeeks = weeklyResults.slice().sort((a,b) => a.wk - b.wk);
 
+  // Copy-to-clipboard state. After a successful copy we flip the chip to
+  // "Copied" for ~1.5s so the user sees confirmation before it resets.
+  const [copyState, setCopyState] = useState('idle'); // 'idle' | 'ok' | 'err'
+  const onCopy = async () => {
+    const text = formatStandingsText(sorted, currentWeek - 1);
+    const ok = await copyText(text);
+    setCopyState(ok ? 'ok' : 'err');
+    setTimeout(() => setCopyState('idle'), 1500);
+    try { navigator.vibrate?.(20); } catch {}
+  };
+  const canCopy = completedWeeks.length > 0;
+
   return <div style={{ paddingBottom:20 }}>
     <TopBar subtitle={`Through Week ${String(currentWeek - 1).padStart(2,'0')}`} title="Standings" right={<BackChip onClick={() => onNav('home')}/>}/>
 
     <div style={{ padding:'0 20px 20px' }}>
-      <div style={{ background: T.ink, color: T.bg, borderRadius:4, padding:'22px 20px' }}>
+      <div style={{ background: T.ink, color: T.bg, borderRadius:4, padding:'22px 20px', position:'relative' }}>
+        {/* Copy chip — only meaningful once at least one week is final. */}
+        {canCopy && <button onClick={onCopy} style={{
+          position:'absolute', top:14, right:14,
+          appearance:'none',
+          background: copyState === 'ok' ? T.hot : 'rgba(247,244,237,0.10)',
+          color: copyState === 'ok' ? T.ink : T.bg,
+          border:`0.5px solid ${copyState === 'ok' ? T.hot : 'rgba(247,244,237,0.25)'}`,
+          padding:'7px 11px', borderRadius:3, cursor:'pointer',
+          fontFamily: FL, fontSize:9, fontWeight:600,
+          letterSpacing:'0.2em', textTransform:'uppercase',
+          transition:'background 150ms, color 150ms, border-color 150ms',
+        }}>
+          {copyState === 'ok' ? '✓ Copied' : copyState === 'err' ? 'Try again' : '↗ Copy'}
+        </button>}
         {completedWeeks.length === 0 ? <>
           <div style={{ fontFamily: FL, fontSize:9, fontWeight:500, letterSpacing:'0.24em', textTransform:'uppercase', color:'rgba(247,244,237,0.4)' }}>Season opener</div>
           <div style={{ fontFamily: FD, fontSize:36, fontWeight:600, letterSpacing:'-0.03em', lineHeight:1.05, marginTop:6 }}>

@@ -107,7 +107,24 @@ export default function App() {
   const { state: rawState, setState: setStateRemote, loading, saveStatus, lastError, retry, refresh, refreshing } = useLeague();
 
   const [screen, setScreen] = useState('home');
-  const [meId, setMeIdState] = useState(null);
+  // Persistent login: rehydrate the last-signed-in player ID from localStorage
+  // so cold starts (especially after iOS Safari reaps the PWA) don't require
+  // re-entering name + PIN every time. The id is just a routing handle —
+  // PIN verification still happens at LoginScreen for the initial sign-in,
+  // and we re-validate that the id resolves to a real player after rehydration.
+  const [meId, setMeIdState] = useState(() => {
+    if (typeof window === 'undefined') return null;
+    try { return window.localStorage.getItem('harvest-moon:me-id') || null; }
+    catch { return null; }
+  });
+  const setMeId = (next) => {
+    setMeIdState(next);
+    if (typeof window === 'undefined') return;
+    try {
+      if (next) window.localStorage.setItem('harvest-moon:me-id', next);
+      else window.localStorage.removeItem('harvest-moon:me-id');
+    } catch {}
+  };
   const [editingWeek, setEditingWeek] = useState(null); // wk number when admin is editing a past week
 
   const contentRef = useRef(null);
@@ -203,7 +220,7 @@ export default function App() {
     return <AppFrame>
       {banner}
       <LoginScreen
-        onLogin={(p) => { setMeIdState(p.id); setScreen('home'); }}
+        onLogin={(p) => { setMeId(p.id); setScreen('home'); }}
         players={state?.players || CANONICAL_PLAYERS}
       />
     </AppFrame>;
@@ -220,7 +237,7 @@ export default function App() {
     standings:       <StandingsScreen     state={state} onNav={onNav}/>,
     team:            <TeamScreen          state={state} me={me} onNav={onNav}/>,
     recap:           <RecapScreen         state={state} onNav={onNav}/>,
-    more:            <MoreScreen          state={state} me={me} setScreen={setScreen} onReset={resetSeason} onSignOut={() => setMeIdState(null)}/>,
+    more:            <MoreScreen          state={state} me={me} setScreen={setScreen} onReset={resetSeason} onSignOut={() => setMeId(null)}/>,
     profile:         <ProfileScreen       state={state} setState={setState} me={me} onBack={() => setScreen('home')}/>,
     schedule:        <ScheduleScreen      state={state} onBack={() => setScreen('more')}/>,
     history:         <HistoryScreen       state={state} me={me} onBack={() => setScreen('more')} onEdit={(wk) => { setEditingWeek(wk); setScreen('edit-results'); }}/>,

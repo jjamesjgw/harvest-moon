@@ -196,10 +196,10 @@ export default function DraftScreen({ state, setState, me, onNav }) {
       remaining={remainingForPicker(activeSeries)}
       isEmpty={activePool.length === 0}
       isAdmin={isAdmin}
-      onAddDriver={() => onNav('drivers')}
+      onAddDriver={() => onNav('manage-drivers')}
     />}
     {!done && activeSeries === 'Cup' && isAdmin && <div style={{ padding:'0 20px 24px' }}>
-      <button onClick={() => onNav('drivers')} style={{
+      <button onClick={() => onNav('manage-drivers')} style={{
         appearance:'none', width:'100%',
         background: T.ink, color: T.bg,
         border:'none', borderRadius:3,
