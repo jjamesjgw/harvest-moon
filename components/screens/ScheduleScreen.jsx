@@ -21,6 +21,16 @@ export default function ScheduleScreen({ state, onBack }) {
           <div style={{ flex:1, minWidth:0 }}>
             <div style={{ fontFamily: FD, fontSize:18, fontWeight:600, letterSpacing:'-0.03em', lineHeight:1.1, color: isNow ? T.hot : T.ink }}>{race.track}</div>
             <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:12, color: T.mute, marginTop:3 }}>{race.type} · {race.len} mi · {race.laps} laps</div>
+            {(race.time || race.network) && <div style={{ fontFamily: FB, fontSize:11, color: T.ink2, marginTop:4, fontVariantNumeric:'tabular-nums' }}>
+              {race.time}{race.time && race.network ? ' · ' : ''}<span style={{
+                display: race.network ? 'inline-block' : 'none',
+                padding:'1px 6px', marginLeft: race.time ? 0 : undefined,
+                background:'rgba(20,17,13,0.06)', borderRadius:2,
+                fontFamily: FL, fontSize:9, fontWeight:600,
+                letterSpacing:'0.16em', textTransform:'uppercase', color: T.ink,
+                verticalAlign:'middle',
+              }}>{race.network}</span>
+            </div>}
           </div>
           <div style={{ textAlign:'right' }}>
             <div style={{ fontFamily: FL, fontSize:9, fontWeight:500, letterSpacing:'0.2em', textTransform:'uppercase', color: isNow ? T.hot : isPast ? T.mute : T.ink2 }}>{isNow ? 'Current' : isPast ? 'Final' : 'Upcoming'}</div>

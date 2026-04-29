@@ -10,7 +10,16 @@ export default function ManageDriversScreen({ state, setState, onBack }) {
   const extraNums = new Set(wkExtras.map(d => d.num));
   const [adding, setAdding] = useState(false);
   const [newD, setNewD] = useState({ num:'', name:'', team:'', primary:'#14110D', secondary:'#F7F4ED' });
+  const [addError, setAddError] = useState(null);
   const [removeArm, setRemoveArm] = useState(null); // num armed for removal
+
+  // Numbers that already exist anywhere in the league — across DEFAULT_DRIVERS
+  // (current week) AND every other week's one-off pool. Prevents adding a
+  // duplicate that would later collide when the schedule reaches that week.
+  const allUsedNums = new Set([
+    ...drivers.map(d => d.num),
+    ...Object.values(state.weekDriversExtra || {}).flat().map(d => d.num),
+  ]);
 
   const remove = (num) => {
     if (!extraNums.has(num)) return; // cannot remove defaults
@@ -30,10 +39,32 @@ export default function ManageDriversScreen({ state, setState, onBack }) {
     }));
   };
   const add = () => {
-    const n = parseInt(newD.num);
-    if (!n || !newD.name.trim() || drivers.find(d => d.num === n)) return;
+    setAddError(null);
+    const n = parseInt(newD.num, 10);
+    const name = newD.name.trim();
+    const team = newD.team.trim();
+    if (!Number.isFinite(n) || n < 0 || n > 999) {
+      setAddError('Car number must be 0–999.');
+      return;
+    }
+    if (!name) {
+      setAddError('Driver name is required.');
+      return;
+    }
+    if (name.length > 24) {
+      setAddError('Driver name must be 24 characters or fewer.');
+      return;
+    }
+    if (allUsedNums.has(n)) {
+      setAddError(`#${n} is already in the league this season.`);
+      return;
+    }
+    if (newD.primary.toLowerCase() === newD.secondary.toLowerCase()) {
+      setAddError('Primary and secondary livery colors must differ.');
+      return;
+    }
     const driver = {
-      num: n, name: newD.name.trim(), team: newD.team.trim() || '—',
+      num: n, name, team: team || '—',
       primary: newD.primary, secondary: newD.secondary,
     };
     setState(s => ({
@@ -78,7 +109,7 @@ export default function ManageDriversScreen({ state, setState, onBack }) {
             <input type="color" value={newD.primary} onChange={e => setNewD({...newD, primary: e.target.value})} style={{ width:36, height:36, border:'none', background:'transparent', cursor:'pointer' }}/>
             <input type="color" value={newD.secondary} onChange={e => setNewD({...newD, secondary: e.target.value})} style={{ width:36, height:36, border:'none', background:'transparent', cursor:'pointer' }}/>
             <div style={{ flex:1 }}/>
-            <button onClick={() => { setAdding(false); setNewD({ num:'', name:'', team:'', primary:'#14110D', secondary:'#F7F4ED' }); }} style={{
+            <button onClick={() => { setAdding(false); setAddError(null); setNewD({ num:'', name:'', team:'', primary:'#14110D', secondary:'#F7F4ED' }); }} style={{
               appearance:'none', background:'transparent', color: T.ink,
               border:`0.5px solid ${T.line}`, borderRadius:3, padding:'10px 14px',
               fontFamily: FL, fontSize:10, fontWeight:500, letterSpacing:'0.2em', textTransform:'uppercase', cursor:'pointer',
@@ -89,6 +120,10 @@ export default function ManageDriversScreen({ state, setState, onBack }) {
               fontFamily: FL, fontSize:10, fontWeight:500, letterSpacing:'0.2em', textTransform:'uppercase', cursor:'pointer',
             }}>Add</button>
           </div>
+          {addError && <div style={{
+            fontFamily: FI, fontStyle:'italic', fontSize:12, color:'#C8102E',
+            padding:'6px 2px 0', lineHeight:1.4,
+          }}>{addError}</div>}
         </div>
       )}
     </div>

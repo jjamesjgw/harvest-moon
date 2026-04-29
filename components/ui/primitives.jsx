@@ -294,6 +294,41 @@ export function YourTurnToast({ kind, onGo }) {
   </button>;
 }
 
+// Slim status strip for "league members are mid-draft and someone else is on the clock".
+// Visible on every screen except the draft itself, so non-pickers know the league is waiting.
+// Renders nothing when it's the current user's turn (their own personal toast handles that).
+export function OnTheClockBanner({ pickerName, onTap }) {
+  if (!pickerName) return null;
+  return <button onClick={onTap} style={{
+    appearance:'none', display:'flex', alignItems:'center', gap:10,
+    background:'linear-gradient(180deg, #14110D 0%, #1c1a16 100%)',
+    color:'#F7F4ED', border:'none',
+    paddingTop:'max(8px, env(safe-area-inset-top))',
+    paddingLeft:16, paddingRight:14, paddingBottom:8,
+    width:'100%', cursor:'pointer', textAlign:'left',
+    flexShrink:0, borderBottom:'1px solid rgba(184,147,90,0.3)',
+  }}>
+    <span style={{ width:7, height:7, borderRadius:'50%', background: T.hot, animation:'pulse 1.6s ease-in-out infinite', flexShrink:0 }}/>
+    <div style={{ flex:1, minWidth:0 }}>
+      <div style={{
+        fontFamily: FL, fontSize:9, fontWeight:600,
+        letterSpacing:'0.22em', textTransform:'uppercase',
+        color:'rgba(247,244,237,0.55)',
+      }}>Draft in progress</div>
+      <div style={{
+        fontFamily: FD, fontSize:14, fontWeight:600,
+        letterSpacing:'-0.02em', marginTop:1,
+        whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis',
+      }}>{pickerName} is on the clock</div>
+    </div>
+    <span style={{
+      fontFamily: FL, fontSize:9, fontWeight:600,
+      letterSpacing:'0.22em', textTransform:'uppercase',
+      color: T.hot, flexShrink:0,
+    }}>View →</span>
+  </button>;
+}
+
 export function SaveBanner({ status, error, onRetry }) {
   const [dismissed, setDismissed] = useState(false);
   useEffect(() => { if (status !== 'error') setDismissed(false); }, [status]);

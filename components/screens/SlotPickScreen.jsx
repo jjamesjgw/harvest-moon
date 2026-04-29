@@ -2,12 +2,11 @@
 import React, { useState, useEffect } from 'react';
 import { BackChip, PlayerBadge, SectionLabel, TopBar } from '@/components/ui/primitives';
 import { FB, FD, FI, FL, T } from '@/lib/constants';
-import { computeStandings } from '@/lib/utils';
+import { buildSlotPickOrder } from '@/lib/utils';
 
 export default function SlotPickScreen({ state, setState, me, onNav }) {
   const { players, weeklyResults, currentWeek, draftState } = state;
-  const standings = computeStandings(players, weeklyResults, currentWeek - 1);
-  const pickOrder = [...standings].sort((a,b) => a.seasonPts - b.seasonPts);
+  const pickOrder = buildSlotPickOrder(players, weeklyResults, currentWeek - 1);
   const idx = draftState.slotPickIdx;
   const picker = pickOrder[idx];
   const taken = new Set(Object.values(draftState.slotAssign));
@@ -80,7 +79,10 @@ export default function SlotPickScreen({ state, setState, me, onNav }) {
       </div>
     </div>
 
-    <SectionLabel>Pick Order · Lowest Points First</SectionLabel>
+    <SectionLabel right={weeklyResults.length === 0
+      ? <span style={{ fontFamily: FI, fontStyle:'italic', fontSize:11, textTransform:'none', letterSpacing:'0.01em', color: T.mute }}>Week 1 · alphabetical</span>
+      : null
+    }>Pick Order · Lowest Points First</SectionLabel>
     <div style={{ padding:'14px 20px 24px' }}>
       {pickOrder.map((p, i, arr) => {
         const done = i < idx;

@@ -1,42 +1,74 @@
 'use client';
-import React from 'react';
+import React, { useState } from 'react';
 import { BackChip, CarNum, LabeledInput, PlayerBadge, SectionLabel, TopBar } from '@/components/ui/primitives';
-import { FB, FD, FI, FL, FM, T } from '@/lib/constants';
+import { ADMIN_ID, FB, FD, FI, FL, FM, T } from '@/lib/constants';
 import { DEFAULT_DRIVERS } from '@/lib/data';
 
-export default function EnterResultsScreen({ state, setState, me, onNav }) {
-  const { players, drivers, schedule, currentWeek, weeklyResults, draftState, adminId } = state;
-  const currentRace = schedule.find(s => s.wk === currentWeek);
-  const admin = players.find(p => p.id === adminId) || players[0];
-  const isAdmin = me.id === admin.id;
+// Recompute the per-player rollup for a given week using its driverPoints + bonuses + overrides.
+// This is invoked on every entry so live standings stay correct, not just on Save & Advance.
+function rollupPts(players, picks, driverPoints = {}, bonuses = {}, overrides = {}) {
+  const pts = {};
+  players.forEach(p => {
+    const nums = picks.filter(pk => pk.playerId === p.id).map(pk => pk.driverNum);
+    const base = nums.reduce((sum, n) => sum + (driverPoints[n] || 0), 0);
+    const b = bonuses[p.id] || 0;
+    const o = overrides[p.id];
+    pts[p.id] = o != null ? o : (base + b);
+  });
+  return pts;
+}
 
-  const existing = weeklyResults.find(w => w.wk === currentWeek);
+export default function EnterResultsScreen({ state, setState, me, onNav, editWeek }) {
+  // editWeek (optional) — when provided, admin is editing a past finalized week
+  // instead of entering the current one. Targeted picks come from draftHistory.
+  const targetWeek = editWeek || state.currentWeek;
+  const isPastEdit = editWeek != null && editWeek !== state.currentWeek;
+
+  const { players, drivers, schedule, weeklyResults, draftState, draftHistory = [] } = state;
+  const currentRace = schedule.find(s => s.wk === targetWeek);
+  const isAdmin = me.id === ADMIN_ID;
+
+  const existing = weeklyResults.find(w => w.wk === targetWeek);
   const driverPoints = existing?.driverPoints || {};
   const bonuses = existing?.bonuses || {};
   const overrides = existing?.overrides || {};
 
-  // Drivers actually picked this week
-  const picks = draftState?.picks || [];
-  const draftedNums = [...new Set(picks.map(p => p.driverNum))];
-  const draftedDrivers = draftedNums.map(n => drivers.find(d => d.num === n)).filter(Boolean).sort((a,b) => a.num - b.num);
+  // For past edits, draft data lives in draftHistory; for current week, in draftState.
+  const picks = isPastEdit
+    ? (draftHistory.find(h => h.wk === targetWeek)?.picks || [])
+    : (draftState?.picks || []);
 
-  // Compute per-player totals
-  const totals = {}; const bases = {};
+  const draftedNums = [...new Set(picks.map(p => p.driverNum))];
+  const draftedDrivers = draftedNums
+    .map(n => drivers.find(d => d.num === n))
+    .filter(Boolean)
+    .sort((a, b) => a.num - b.num);
+
+  // Display totals — recomputed on render so live values track inputs exactly.
+  const totals = rollupPts(players, picks, driverPoints, bonuses, overrides);
+  const bases = {};
   players.forEach(p => {
     const nums = picks.filter(pk => pk.playerId === p.id).map(pk => pk.driverNum);
-    const base = nums.reduce((s, n) => s + (driverPoints[n] || 0), 0);
-    bases[p.id] = base;
-    const bonus = bonuses[p.id] || 0;
-    const ov = overrides[p.id];
-    totals[p.id] = ov != null ? ov : (base + bonus);
+    bases[p.id] = nums.reduce((s, n) => s + (driverPoints[n] || 0), 0);
   });
 
+  // ALWAYS recomputes pts so non-admins' standings views stay consistent during entry.
   const patchWeek = (updates) => {
     setState(s => {
-      const ex = s.weeklyResults.find(w => w.wk === s.currentWeek) || {};
-      const track = s.schedule.find(sc => sc.wk === s.currentWeek)?.track;
-      const merged = { ...ex, wk: s.currentWeek, track, ...updates };
-      return { ...s, weeklyResults: [...s.weeklyResults.filter(w => w.wk !== s.currentWeek), merged] };
+      const ex = s.weeklyResults.find(w => w.wk === targetWeek) || {};
+      const track = s.schedule.find(sc => sc.wk === targetWeek)?.track;
+      const wkPicks = isPastEdit
+        ? ((s.draftHistory || []).find(h => h.wk === targetWeek)?.picks || [])
+        : (s.draftState?.picks || []);
+      const merged = { ...ex, wk: targetWeek, track, ...updates };
+      merged.pts = rollupPts(
+        s.players,
+        wkPicks,
+        merged.driverPoints || {},
+        merged.bonuses || {},
+        merged.overrides || {},
+      );
+      return { ...s, weeklyResults: [...s.weeklyResults.filter(w => w.wk !== targetWeek), merged] };
     });
   };
 
@@ -46,8 +78,10 @@ export default function EnterResultsScreen({ state, setState, me, onNav }) {
     patchWeek({ driverPoints: next });
   };
   const setBonus = (pid, val) => {
+    const next = { ...bonuses };
     const v = val === '' ? 0 : (parseInt(val) || 0);
-    patchWeek({ bonuses: { ...bonuses, [pid]: v } });
+    if (v === 0) delete next[pid]; else next[pid] = v;
+    patchWeek({ bonuses: next });
   };
   const setOverride = (pid, val) => {
     const next = { ...overrides };
@@ -55,18 +89,25 @@ export default function EnterResultsScreen({ state, setState, me, onNav }) {
     patchWeek({ overrides: next });
   };
 
+  // Two-tap confirmation: arm on first tap, fire on second within 3s.
+  const [advanceArm, setAdvanceArm] = useState(false);
   const saveAndAdvance = () => {
+    if (!advanceArm) {
+      setAdvanceArm(true);
+      setTimeout(() => setAdvanceArm(false), 3000);
+      return;
+    }
+    setAdvanceArm(false);
     setState(s => {
       const ex = s.weeklyResults.find(w => w.wk === s.currentWeek) || {};
       const track = s.schedule.find(sc => sc.wk === s.currentWeek)?.track;
-      const pts = {};
-      s.players.forEach(p => {
-        const nums = (s.draftState?.picks || []).filter(pk => pk.playerId === p.id).map(pk => pk.driverNum);
-        const base = nums.reduce((sum, n) => sum + ((ex.driverPoints || {})[n] || 0), 0);
-        const b = (ex.bonuses || {})[p.id] || 0;
-        const o = (ex.overrides || {})[p.id];
-        pts[p.id] = o != null ? o : (base + b);
-      });
+      const pts = rollupPts(
+        s.players,
+        s.draftState?.picks || [],
+        ex.driverPoints || {},
+        ex.bonuses || {},
+        ex.overrides || {},
+      );
       const newRes = { ...ex, wk: s.currentWeek, track, pts, finalized: true };
       const draftHistory = [...(s.draftHistory || [])];
       if (s.draftState?.picks?.length > 0 && !draftHistory.find(h => h.wk === s.currentWeek)) {
@@ -87,22 +128,27 @@ export default function EnterResultsScreen({ state, setState, me, onNav }) {
     setTimeout(() => onNav('home'), 200);
   };
 
-  const sorted = [...players].sort((a,b) => (totals[b.id] || 0) - (totals[a.id] || 0));
+  const sorted = [...players].sort((a, b) => (totals[b.id] || 0) - (totals[a.id] || 0));
   const anyEntered = Object.keys(driverPoints).length > 0 || Object.keys(overrides).length > 0;
 
   return <div style={{ paddingBottom:20 }}>
-    <TopBar subtitle={`Wk ${String(currentWeek).padStart(2,'0')} · ${currentRace?.track || ''}`} title="Results" right={<BackChip onClick={() => onNav('home')}/>}/>
+    <TopBar
+      subtitle={`Wk ${String(targetWeek).padStart(2,'0')} · ${currentRace?.track || ''}${isPastEdit ? ' · Editing' : ''}`}
+      title={isPastEdit ? 'Edit Results' : 'Results'}
+      right={<BackChip onClick={() => onNav(isPastEdit ? 'history' : 'home')}/>}
+    />
 
-    {/* Hero */}
     <div style={{ padding:'0 20px 16px' }}>
       <div style={{ background: T.ink, color: T.bg, borderRadius:4, padding:'18px 20px' }}>
         <div style={{ fontFamily: FL, fontSize:9, fontWeight:500, letterSpacing:'0.24em', textTransform:'uppercase', color:'rgba(247,244,237,0.4)' }}>
-          {isAdmin ? 'Commissioner Entry' : 'Waiting on Commissioner'}
+          {isPastEdit ? 'Editing Past Week' : (isAdmin ? 'Commissioner Entry' : 'Waiting on Commissioner')}
         </div>
         <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:14, color:'rgba(247,244,237,0.75)', marginTop:8, lineHeight:1.5 }}>
           {isAdmin
-            ? 'Enter each drafted driver\u2019s Cup points from nascar.com. Totals update live. Use Bonus for other-series drivers, Override to set a final number.'
-            : `${admin.name} will enter driver points after the race.`}
+            ? (isPastEdit
+                ? 'Updating a past week. Standings recalculate automatically. Tap Done when finished.'
+                : 'Enter each drafted driver\u2019s Cup points from nascar.com. Totals update live. Use Bonus for other-series drivers, Override to set a final number.')
+            : 'Admin will enter driver points after the race.'}
         </div>
       </div>
     </div>
@@ -172,13 +218,29 @@ export default function EnterResultsScreen({ state, setState, me, onNav }) {
       })}
     </div>
 
-    {isAdmin && anyEntered && <div style={{ padding:'0 20px 20px' }}>
+    {isAdmin && !isPastEdit && anyEntered && <div style={{ padding:'0 20px 20px' }}>
       <button onClick={saveAndAdvance} style={{
+        appearance:'none', width:'100%', padding:16,
+        background: advanceArm ? T.hot : T.ink,
+        color: advanceArm ? T.ink : T.bg,
+        border:'none', borderRadius:3, cursor:'pointer',
+        fontFamily: FL, fontSize:11, fontWeight:500,
+        letterSpacing:'0.24em', textTransform:'uppercase',
+      }}>{advanceArm
+        ? `Tap again to confirm — locks Wk ${String(state.currentWeek).padStart(2,'0')}`
+        : `Save & Advance to Week ${String(state.currentWeek+1).padStart(2,'0')} →`}</button>
+      <div style={{ marginTop:10, fontFamily: FI, fontStyle:'italic', fontSize:12, color: T.mute, textAlign:'center', lineHeight:1.5 }}>
+        This locks results for Week {String(state.currentWeek).padStart(2,'0')} and starts the next draft. You can still edit past weeks from History.
+      </div>
+    </div>}
+
+    {isAdmin && isPastEdit && <div style={{ padding:'0 20px 20px' }}>
+      <button onClick={() => onNav('history')} style={{
         appearance:'none', width:'100%', padding:16,
         background: T.ink, color: T.bg, border:'none', borderRadius:3, cursor:'pointer',
         fontFamily: FL, fontSize:11, fontWeight:500,
         letterSpacing:'0.24em', textTransform:'uppercase',
-      }}>Save & Advance to Week {String(currentWeek+1).padStart(2,'0')} →</button>
+      }}>Done · Back to History</button>
     </div>}
   </div>;
 }

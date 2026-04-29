@@ -8,10 +8,10 @@ import {
 } from '@/lib/constants';
 import { DEFAULT_DRIVERS, DEFAULT_SCHEDULE } from '@/lib/data';
 import {
-  buildSnakeOrder, computeStandings, makeFreshState,
+  buildSlotPickOrder, buildSnakeOrder, computeStandings, makeFreshState,
 } from '@/lib/utils';
 import {
-  AppFrame, TabBar, SaveBanner, YourTurnToast,
+  AppFrame, TabBar, OnTheClockBanner, SaveBanner, YourTurnToast,
 } from '@/components/ui/primitives';
 
 import HomeScreen          from '@/components/screens/HomeScreen';
@@ -41,7 +41,7 @@ const SCREEN_TO_TAB = {
   team:'team',
   more:'more', schedule:'more', history:'more', rules:'more',
   members:'more', switch:'more', recap:'more', drivers:'more',
-  profile:'more', sync:'more',
+  profile:'more', sync:'more', 'edit-results':'more',
 };
 
 // Apply migrations to remote state before consumption.
@@ -74,21 +74,24 @@ function migrateState(rawState) {
   return patched;
 }
 
-// Computes whether `meId` is currently on the clock and which kind of pick is owed.
-function detectMyTurn(state, meId) {
-  if (!state || !meId) return null;
+// Computes the active draft turn: which player is on the clock and what kind
+// of pick is owed (slot or snake). Returns null when no draft is active.
+function detectActiveTurn(state) {
+  if (!state) return null;
   const ds = state.draftState;
   if (!ds) return null;
   if (ds.phase === 'slot-pick') {
-    const standings = computeStandings(state.players, state.weeklyResults, state.currentWeek - 1);
-    const order = [...standings].sort((a, b) => a.seasonPts - b.seasonPts);
+    const order = buildSlotPickOrder(state.players, state.weeklyResults, state.currentWeek - 1);
     const picker = order[ds.slotPickIdx];
-    if (picker?.id === meId) return { kind: 'slot' };
+    if (picker) return { kind: 'slot', playerId: picker.id, name: picker.name };
   }
   if (ds.phase === 'snake') {
     const order = buildSnakeOrder(state.players, ds.slotAssign, ROUNDS_PER_WEEK);
     const onClock = order[ds.picks.length];
-    if (onClock?.playerId === meId) return { kind: 'snake', round: onClock.round };
+    if (onClock?.playerId) {
+      const player = state.players.find(p => p.id === onClock.playerId);
+      if (player) return { kind: 'snake', round: onClock.round, playerId: player.id, name: player.name };
+    }
   }
   return null;
 }
@@ -102,6 +105,7 @@ export default function App() {
 
   const [screen, setScreen] = useState('home');
   const [meId, setMeIdState] = useState(null);
+  const [editingWeek, setEditingWeek] = useState(null); // wk number when admin is editing a past week
 
   const contentRef = useRef(null);
   const driversReturnRef = useRef('more');
@@ -126,8 +130,13 @@ export default function App() {
     if (contentRef.current) contentRef.current.scrollTop = 0;
   }, [screen]);
 
-  // "Your turn" detection + haptic buzz on transitions.
-  const myTurnInfo = useMemo(() => detectMyTurn(state, meId), [state, meId]);
+  // Turn detection — now player-agnostic. We derive both "active picker info"
+  // and "is it me?" from one source.
+  const activeTurn = useMemo(() => detectActiveTurn(state), [state]);
+  const isMyTurn = activeTurn && me && activeTurn.playerId === me.id;
+  const myTurnInfo = isMyTurn ? activeTurn : null;
+
+  // Haptic buzz when MY turn arrives.
   useEffect(() => {
     const sig = myTurnInfo ? `${myTurnInfo.kind}-${myTurnInfo.round || 0}` : null;
     if (sig && sig !== lastTurnRef.current) {
@@ -166,8 +175,16 @@ export default function App() {
   };
 
   const banner = <SaveBanner status={saveStatus} error={lastError} onRetry={retry}/>;
-  const turnToast = myTurnInfo && screen !== 'slot' && screen !== 'draft'
+
+  // The personal toast (your turn) supersedes the global on-the-clock banner so
+  // the screen never stacks both. Hide both on the screens that already show
+  // turn information natively (slot, draft).
+  const onDraftScreen = screen === 'slot' || screen === 'draft';
+  const turnToast = myTurnInfo && !onDraftScreen
     ? <YourTurnToast kind={myTurnInfo.kind} onGo={() => onNav('draft')}/>
+    : null;
+  const draftBanner = activeTurn && !isMyTurn && !onDraftScreen
+    ? <OnTheClockBanner pickerName={activeTurn.name} onTap={() => onNav('draft')}/>
     : null;
 
   // ─── Loading + login gates ──────────────────────────
@@ -197,13 +214,14 @@ export default function App() {
     slot:            <SlotPickScreen      state={state} setState={setState} me={me} onNav={onNav}/>,
     draft:           <DraftScreen         state={state} setState={setState} me={me} onNav={onNav}/>,
     'enter-results': <EnterResultsScreen  state={state} setState={setState} me={me} onNav={onNav}/>,
+    'edit-results':  <EnterResultsScreen  state={state} setState={setState} me={me} onNav={(id) => { setEditingWeek(null); onNav(id); }} editWeek={editingWeek}/>,
     standings:       <StandingsScreen     state={state} onNav={onNav}/>,
     team:            <TeamScreen          state={state} me={me} onNav={onNav}/>,
     recap:           <RecapScreen         state={state} onNav={onNav}/>,
     more:            <MoreScreen          state={state} me={me} setScreen={setScreen} onReset={resetSeason} onSignOut={() => setMeIdState(null)}/>,
     profile:         <ProfileScreen       state={state} setState={setState} me={me} onBack={() => setScreen('home')}/>,
     schedule:        <ScheduleScreen      state={state} onBack={() => setScreen('more')}/>,
-    history:         <HistoryScreen       state={state} onBack={() => setScreen('more')}/>,
+    history:         <HistoryScreen       state={state} me={me} onBack={() => setScreen('more')} onEdit={(wk) => { setEditingWeek(wk); setScreen('edit-results'); }}/>,
     rules:           <RulesScreen         state={state} onBack={() => setScreen('more')}/>,
     members:         <MembersScreen       state={state} setState={setState} onBack={() => setScreen('more')}/>,
     switch:          <SwitchScreen        state={state} me={me} setMe={(p) => setMeIdState(p.id)} onBack={() => setScreen(screen === 'switch' ? 'home' : 'more')}/>,
@@ -213,6 +231,7 @@ export default function App() {
   return <AppFrame>
     {banner}
     {turnToast}
+    {draftBanner}
     <div ref={contentRef} className="hm-scroll" style={{ flex:1, overflowY:'auto', background: T.bg }}>
       {screens[screen]}
     </div>

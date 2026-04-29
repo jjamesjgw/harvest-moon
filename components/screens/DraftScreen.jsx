@@ -8,9 +8,6 @@ export default function DraftScreen({ state, setState, me, onNav }) {
   const { players, drivers, schedule, currentWeek, draftState, adminId } = state;
   const currentRace = schedule.find(s => s.wk === currentWeek);
   const isAdmin = me.id === adminId;
-  const [layout, setLayout] = useState('grid'); // grid | list | snake
-  const [search, setSearch] = useState('');
-  const [numPad, setNumPad] = useState('');
   const [resetArm, setResetArm] = useState(false);
 
   const resetDraft = () => {
@@ -23,8 +20,13 @@ export default function DraftScreen({ state, setState, me, onNav }) {
     onNav('slot');
   };
 
-  // Stable per-week driver data (seeded)
-  const weekDrivers = useMemo(() => makeDriverWeekData(drivers, currentWeek * 100 + drivers.length), [drivers, currentWeek]);
+  // Stable per-week driver data (seeded). We keep the seeded RNG even though
+  // the odds it generates are no longer rendered, because makeDriverWeekData
+  // also produces the recent3/trackAvg fields used by Team's past rosters.
+  const weekDrivers = useMemo(
+    () => makeDriverWeekData(drivers, currentWeek * 100 + drivers.length),
+    [drivers, currentWeek]
+  );
 
   const snakeOrder = buildSnakeOrder(players, draftState.slotAssign, ROUNDS_PER_WEEK);
 
@@ -55,7 +57,6 @@ export default function DraftScreen({ state, setState, me, onNav }) {
         phase: completing ? 'done' : 'snake',
       }
     }));
-    setNumPad(''); setSearch('');
   };
 
   const undo = () => {
@@ -66,12 +67,6 @@ export default function DraftScreen({ state, setState, me, onNav }) {
       draftState: { ...s.draftState, picks: newPicks, phase: 'snake' }
     }));
   };
-
-  const filtered = weekDrivers.filter(d => {
-    if (numPad && !String(d.num).startsWith(numPad)) return false;
-    if (search && !d.name.toLowerCase().includes(search.toLowerCase())) return false;
-    return true;
-  });
 
   return <div style={{ paddingBottom:20, display:'flex', flexDirection:'column', minHeight:'100%' }}>
     <div style={{ position:'sticky', top:0, zIndex:5, background: T.bg, paddingBottom:10 }}>
@@ -110,7 +105,7 @@ export default function DraftScreen({ state, setState, me, onNav }) {
       </div>}
     </div>
 
-    {!done && <DraftGrid drivers={filtered} pickedNums={pickedNums} draftState={draftState} players={players} currentRace={currentRace} onPick={pick} myTurn={myTurn} />}
+    {!done && <DraftGrid drivers={weekDrivers} pickedNums={pickedNums} draftState={draftState} players={players} currentRace={currentRace} onPick={pick} myTurn={myTurn} />}
     {!done && <div style={{ padding:'0 20px 24px' }}>
       <button onClick={() => onNav('drivers')} style={{
         appearance:'none', width:'100%',

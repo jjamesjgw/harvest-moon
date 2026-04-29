@@ -26,8 +26,9 @@ export default function StandingsScreen({ state, onNav }) {
 
     <SectionLabel>Season Ranking</SectionLabel>
     <div style={{ padding:'14px 20px 20px' }}>
-      {sorted.map((p, i) => (
-        <div key={p.id} style={{
+      {sorted.map((p, i) => {
+        const gap = i === 0 ? 0 : sorted[0].seasonPts - p.seasonPts;
+        return <div key={p.id} style={{
           padding:'14px 0',
           borderBottom: i === sorted.length-1 ? 'none' : `0.5px solid ${T.line2}`,
           display:'flex', alignItems:'center', gap:14,
@@ -42,10 +43,14 @@ export default function StandingsScreen({ state, onNav }) {
           </div>
           <div style={{ textAlign:'right', minWidth:78 }}>
             <div style={{ fontFamily: FB, fontSize:15, fontWeight:500, fontVariantNumeric:'tabular-nums', letterSpacing:'-0.01em' }}>{p.seasonPts.toLocaleString()}</div>
-            <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:11, color: T.mute, marginTop:1 }}>{p.wins} weekly {p.wins === 1 ? 'win' : 'wins'}{p.avgPts ? ` · avg ${p.avgPts}` : ''}</div>
+            <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:11, color: T.mute, marginTop:1, fontVariantNumeric:'tabular-nums' }}>
+              {i === 0
+                ? `${p.wins} ${p.wins === 1 ? 'win' : 'wins'}${p.avgPts ? ` · avg ${p.avgPts}` : ''}`
+                : `−${gap.toLocaleString()} back${p.avgPts ? ` · avg ${p.avgPts}` : ''}`}
+            </div>
           </div>
-        </div>
-      ))}
+        </div>;
+      })}
     </div>
 
     {completedWeeks.length > 0 && <>

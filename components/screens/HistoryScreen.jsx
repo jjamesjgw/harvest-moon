@@ -1,13 +1,14 @@
 'use client';
 import React, { useState } from 'react';
 import { BackChip, CarNum, PlayerBadge, TopBar } from '@/components/ui/primitives';
-import { FB, FD, FI, FL, T } from '@/lib/constants';
+import { ADMIN_ID, FB, FD, FI, FL, T } from '@/lib/constants';
 import { DEFAULT_DRIVERS } from '@/lib/data';
 
-export default function HistoryScreen({ state, onBack }) {
+export default function HistoryScreen({ state, me, onBack, onEdit }) {
   const { players, weeklyResults, draftHistory = [] } = state;
   const drivers = [...DEFAULT_DRIVERS, ...Object.values(state.weekDriversExtra || {}).flat()];
   const [expanded, setExpanded] = useState(null);
+  const isAdmin = me?.id === ADMIN_ID;
   const results = weeklyResults.sort((a,b) => b.wk - a.wk);
 
   return <div style={{ paddingBottom:20 }}>
@@ -39,29 +40,43 @@ export default function HistoryScreen({ state, onBack }) {
             </div>
             <div style={{ color: T.mute, fontFamily: FD, fontSize:18, fontStyle:'italic' }}>{isExp ? '—' : '+'}</div>
           </button>
-          {isExp && h && <div style={{ paddingBottom:14 }}>
-            {players.map((p, i) => {
-              const roster = h.picks.filter(pk => pk.playerId === p.id);
-              const isTop = topPid && p.id === topPid[0];
-              return <div key={p.id} style={{
-                padding:'10px 0', display:'flex', alignItems:'center', gap:10,
-                borderTop:`0.5px solid ${T.line2}`,
-              }}>
-                <PlayerBadge player={p} size={18}/>
-                <span style={{ fontFamily: FD, fontSize:14, width:66, letterSpacing:'-0.03em' }}>{p.name}</span>
-                <div style={{ display:'flex', gap:4, flex:1, flexWrap:'wrap' }}>
-                  {roster.map(pk => {
-                    const d = drivers.find(dv => dv.num === pk.driverNum);
-                    return d && <CarNum key={pk.driverNum} driver={d} size={22}/>;
-                  })}
-                </div>
-                <span style={{ fontFamily: FB, fontSize:13, fontWeight:600, fontVariantNumeric:'tabular-nums', color: isTop ? T.hot : T.ink }}>{w.pts[p.id] || 0}</span>
-              </div>;
-            })}
-          </div>}
-          {isExp && !h && <div style={{ padding:'10px 0 14px', fontFamily: FI, fontStyle:'italic', fontSize:12, color: T.mute }}>
-            Draft wasn't recorded for this week.
-          </div>}
+          {isExp && <>
+            {h && <div style={{ paddingBottom:14 }}>
+              {[...players]
+                .sort((a, b) => (w.pts[b.id] || 0) - (w.pts[a.id] || 0))
+                .map(p => {
+                  const roster = h.picks.filter(pk => pk.playerId === p.id);
+                  const isTop = topPid && p.id === topPid[0];
+                  return <div key={p.id} style={{
+                    padding:'10px 0', display:'flex', alignItems:'center', gap:10,
+                    borderTop:`0.5px solid ${T.line2}`,
+                  }}>
+                    <PlayerBadge player={p} size={18}/>
+                    <span style={{ fontFamily: FD, fontSize:14, width:66, letterSpacing:'-0.03em' }}>{p.name}</span>
+                    <div style={{ display:'flex', gap:4, flex:1, flexWrap:'wrap' }}>
+                      {roster.map(pk => {
+                        const d = drivers.find(dv => dv.num === pk.driverNum);
+                        return d && <CarNum key={pk.driverNum} driver={d} size={22}/>;
+                      })}
+                    </div>
+                    <span style={{ fontFamily: FB, fontSize:13, fontWeight:600, fontVariantNumeric:'tabular-nums', color: isTop ? T.hot : T.ink }}>{w.pts[p.id] || 0}</span>
+                  </div>;
+                })}
+            </div>}
+            {!h && <div style={{ padding:'10px 0 14px', fontFamily: FI, fontStyle:'italic', fontSize:12, color: T.mute }}>
+              Draft wasn't recorded for this week.
+            </div>}
+            {isAdmin && h && <div style={{ paddingBottom:14, paddingTop:6 }}>
+              <button onClick={() => onEdit(w.wk)} style={{
+                appearance:'none', width:'100%',
+                background:'transparent', color: T.hot,
+                border:`0.5px solid ${T.hot}`, borderRadius:3,
+                padding:'10px 14px', cursor:'pointer',
+                fontFamily: FL, fontSize:10, fontWeight:500,
+                letterSpacing:'0.22em', textTransform:'uppercase',
+              }}>✎ Edit Week {String(w.wk).padStart(2,'0')} Results</button>
+            </div>}
+          </>}
         </div>;
       })}
     </div>

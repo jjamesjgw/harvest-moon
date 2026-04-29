@@ -1,7 +1,8 @@
 'use client';
 import React from 'react';
 import { PlayerBadge, SectionLabel, TopBar } from '@/components/ui/primitives';
-import { FB, FD, FI, FL, ROUNDS_PER_WEEK, T } from '@/lib/constants';
+import { InstallHint } from '@/components/ui/InstallHint';
+import { ADMIN_ID, FB, FD, FI, FL, ROUNDS_PER_WEEK, T } from '@/lib/constants';
 import { computeStandings, ordinalSuffix } from '@/lib/utils';
 
 export default function HomeScreen({ state, me, onNav }) {
@@ -19,14 +20,35 @@ export default function HomeScreen({ state, me, onNav }) {
   const pickCount = draftState?.picks?.length || 0;
   const draftComplete = phase === 'done' || pickCount >= totalPicks;
 
+  // Detect "results due": draft for this week is done but no finalized result yet.
+  const thisWeekResult = weeklyResults.find(w => w.wk === currentWeek);
+  const resultsDue = draftComplete && !thisWeekResult?.finalized;
+  const isAdmin = me.id === ADMIN_ID;
+
   const statusLine = () => {
     if (phase === 'not-started') return 'Tap to start draft';
     if (phase === 'slot-pick') return `Pick-your-slot · ${draftState.slotPickIdx + 1}/${players.length}`;
-    if (phase === 'ready') return `Slots locked · waiting to start`;
+    if (phase === 'ready') return 'Slots locked · waiting to start';
     if (phase === 'snake' && !draftComplete) return `Round ${draftState.currentRound} · pick ${pickCount + 1} of ${totalPicks}`;
-    if (draftComplete) return `Roster set · enter results when race finishes`;
+    if (resultsDue) return isAdmin ? 'Results due — tap to enter Cup points' : 'Waiting on commissioner to enter results';
+    if (draftComplete) return 'Roster set · enter results when race finishes';
     return 'Ready';
   };
+
+  const ctaLabel = resultsDue
+    ? (isAdmin ? 'Enter Results →' : 'View Status')
+    : draftComplete
+      ? 'Enter Results'
+      : phase === 'not-started'
+        ? 'Begin'
+        : 'Enter';
+  const ctaTarget = resultsDue
+    ? 'enter-results'
+    : draftComplete
+      ? 'enter-results'
+      : (phase === 'slot-pick' || phase === 'not-started')
+        ? 'slot'
+        : 'draft';
 
   return <div style={{ paddingBottom: 20 }}>
     <TopBar
@@ -39,6 +61,33 @@ export default function HomeScreen({ state, me, onNav }) {
       }}>{me.initial}</button>}
     />
 
+    <InstallHint />
+
+    {/* "Results due" callout — shows above the hero only when this is the
+        admin's pending action, so it grabs attention. Non-admins still see
+        the inline status note in the hero card below. */}
+    {resultsDue && isAdmin && <div style={{ padding:'0 20px 14px' }}>
+      <button onClick={() => onNav('enter-results')} style={{
+        appearance:'none', width:'100%', textAlign:'left',
+        background:'linear-gradient(180deg, #C9A268 0%, #B8935A 50%, #9A7A48 100%)',
+        color: T.ink, border:'1px solid rgba(255,255,255,0.18)',
+        borderRadius:8, padding:'14px 16px', cursor:'pointer',
+        boxShadow:'inset 0 1px 0 rgba(255,255,255,0.4), 0 6px 20px rgba(20,17,13,0.2)',
+        display:'flex', alignItems:'center', gap:14,
+      }}>
+        <div style={{
+          fontSize:24, lineHeight:1, animation:'pulse 1.6s ease-in-out infinite',
+        }}>🏁</div>
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ fontFamily: FL, fontSize:9, fontWeight:600, letterSpacing:'0.24em', textTransform:'uppercase' }}>Results Due</div>
+          <div style={{ fontFamily: FD, fontSize:16, fontWeight:600, letterSpacing:'-0.02em', marginTop:2 }}>
+            {currentRace.track} is in the books — enter Cup points
+          </div>
+        </div>
+        <div style={{ fontFamily: FL, fontSize:9, fontWeight:600, letterSpacing:'0.22em', textTransform:'uppercase', flexShrink:0 }}>Go →</div>
+      </button>
+    </div>}
+
     {/* Hero card: this week's race */}
     <div style={{ padding:'0 20px 16px' }}>
       <div style={{ background: T.ink, color: T.bg, borderRadius:4, overflow:'hidden', position:'relative' }}>
@@ -46,7 +95,7 @@ export default function HomeScreen({ state, me, onNav }) {
           <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:14 }}>
             <div style={{ width:5, height:5, borderRadius:'50%', background: T.hot }}/>
             <div style={{ fontFamily: FL, fontSize:9, fontWeight:500, letterSpacing:'0.24em', color: T.hot, textTransform:'uppercase' }}>
-              {draftComplete ? 'Race Day' : 'Drafting Now'}
+              {resultsDue ? 'Race Day · Results Due' : draftComplete ? 'Race Day' : 'Drafting Now'}
             </div>
             <div style={{ fontFamily: FL, fontSize:9, fontWeight:400, letterSpacing:'0.18em', color:'rgba(247,244,237,0.4)', textTransform:'uppercase', marginLeft:'auto' }}>
               Round {String(currentWeek).padStart(2,'0')}
@@ -56,19 +105,32 @@ export default function HomeScreen({ state, me, onNav }) {
           <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:13, color:'rgba(247,244,237,0.55)', marginTop:8, letterSpacing:'0.01em' }}>
             {currentRace.type} · {currentRace.len} mi · {currentRace.laps} laps
           </div>
+          {(currentRace.time || currentRace.network) && <div style={{ marginTop:10, display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+            {currentRace.time && <span style={{
+              fontFamily: FB, fontSize:12, fontWeight:500,
+              color: T.bg, fontVariantNumeric:'tabular-nums',
+            }}>{currentRace.date} · {currentRace.time}</span>}
+            {currentRace.network && <span style={{
+              padding:'2px 8px',
+              background: T.hot, color: T.ink,
+              borderRadius:2,
+              fontFamily: FL, fontSize:9, fontWeight:700,
+              letterSpacing:'0.2em', textTransform:'uppercase',
+            }}>{currentRace.network}</span>}
+          </div>}
         </div>
         <div style={{ padding:'14px 20px', borderTop:'0.5px solid rgba(247,244,237,0.08)', display:'flex', gap:12, alignItems:'center' }}>
           <div style={{ flex:1 }}>
             <div style={{ fontFamily: FL, fontSize:9, letterSpacing:'0.24em', textTransform:'uppercase', color:'rgba(247,244,237,0.4)' }}>Status</div>
             <div style={{ fontFamily: FB, fontSize:13, marginTop:3, color:'rgba(247,244,237,0.85)' }}>{statusLine()}</div>
           </div>
-          <button onClick={() => onNav(draftComplete ? 'enter-results' : (phase === 'slot-pick' ? 'slot' : (phase === 'not-started' ? 'slot' : 'draft')))} style={{
+          <button onClick={() => onNav(ctaTarget)} style={{
             appearance:'none', background:'transparent', color: T.bg,
             border:'0.5px solid rgba(247,244,237,0.3)',
             padding:'9px 16px', borderRadius:3, cursor:'pointer',
             fontFamily: FL, fontWeight:500, fontSize:10,
             letterSpacing:'0.2em', textTransform:'uppercase',
-          }}>{draftComplete ? 'Enter Results' : (phase === 'not-started' ? 'Begin' : 'Enter')}</button>
+          }}>{ctaLabel}</button>
         </div>
       </div>
     </div>
@@ -85,8 +147,10 @@ export default function HomeScreen({ state, me, onNav }) {
         </div>
         <div style={{ flex:1 }}>
           <div style={{ fontFamily: FL, fontSize:9, letterSpacing:'0.24em', textTransform:'uppercase', color: T.mute }}>Your Standing</div>
-          <div style={{ fontFamily: FB, fontSize:13, color: T.ink2, marginTop:4 }}>
-            {meStanding.seasonPts.toLocaleString()} pts · {meStanding.wins} weekly {meStanding.wins === 1 ? 'win' : 'wins'}
+          <div style={{ fontFamily: FB, fontSize:13, color: T.ink2, marginTop:4, fontVariantNumeric:'tabular-nums' }}>
+            {meStanding.seasonPts.toLocaleString()} pts · {rank === 1
+              ? `${meStanding.wins} weekly ${meStanding.wins === 1 ? 'win' : 'wins'}`
+              : `−${(sorted[0].seasonPts - meStanding.seasonPts).toLocaleString()} back of ${sorted[0].name}`}
           </div>
         </div>
         <button onClick={() => onNav('standings')} style={{
@@ -127,7 +191,9 @@ export default function HomeScreen({ state, me, onNav }) {
             <div style={{ fontFamily: FL, fontSize:10, fontWeight:500, letterSpacing:'0.2em', textTransform:'uppercase', color: T.mute, width:56 }}>Wk {String(race.wk).padStart(2,'0')}</div>
             <div style={{ flex:1 }}>
               <div style={{ fontFamily: FD, fontSize:20, fontWeight:600, letterSpacing:'-0.03em', lineHeight:1.1 }}>{race.track}</div>
-              <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:12, color: T.mute, marginTop:3 }}>{race.type} · {race.date}</div>
+              <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:12, color: T.mute, marginTop:3 }}>
+                {race.type} · {race.date}{race.time ? ` · ${race.time}` : ''}{race.network ? ` · ${race.network}` : ''}
+              </div>
             </div>
           </div>
         ))}

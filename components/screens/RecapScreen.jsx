@@ -53,25 +53,27 @@ export default function RecapScreen({ state, onNav }) {
     {hist && <>
       <SectionLabel>Rosters · How it Broke Down</SectionLabel>
       <div style={{ padding:'14px 20px 20px' }}>
-        {players.map((p, i, arr) => {
-          const roster = hist.picks.filter(pk => pk.playerId === p.id);
-          return <div key={p.id} style={{
-            padding:'14px 0',
-            borderBottom: i === arr.length-1 ? 'none' : `0.5px solid ${T.line2}`,
-          }}>
-            <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
-              <PlayerBadge player={p} size={20}/>
-              <span style={{ fontFamily: FD, fontSize:16, fontWeight:600, letterSpacing:'-0.03em' }}>{p.name}</span>
-              <span style={{ marginLeft:'auto', fontFamily: FB, fontSize:14, fontWeight:500, fontVariantNumeric:'tabular-nums' }}>{last.pts[p.id] || 0} pts</span>
-            </div>
-            <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
-              {roster.map(pk => {
-                const d = drivers.find(dv => dv.num === pk.driverNum);
-                return d && <CarNum key={pk.driverNum} driver={d} size={26}/>;
-              })}
-            </div>
-          </div>;
-        })}
+        {[...players]
+          .sort((a, b) => (last.pts[b.id] || 0) - (last.pts[a.id] || 0))
+          .map((p, i, arr) => {
+            const roster = hist.picks.filter(pk => pk.playerId === p.id);
+            return <div key={p.id} style={{
+              padding:'14px 0',
+              borderBottom: i === arr.length-1 ? 'none' : `0.5px solid ${T.line2}`,
+            }}>
+              <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
+                <PlayerBadge player={p} size={20}/>
+                <span style={{ fontFamily: FD, fontSize:16, fontWeight:600, letterSpacing:'-0.03em' }}>{p.name}</span>
+                <span style={{ marginLeft:'auto', fontFamily: FB, fontSize:14, fontWeight:500, fontVariantNumeric:'tabular-nums' }}>{last.pts[p.id] || 0} pts</span>
+              </div>
+              <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
+                {roster.map(pk => {
+                  const d = drivers.find(dv => dv.num === pk.driverNum);
+                  return d && <CarNum key={pk.driverNum} driver={d} size={26}/>;
+                })}
+              </div>
+            </div>;
+          })}
       </div>
     </>}
   </div>;
