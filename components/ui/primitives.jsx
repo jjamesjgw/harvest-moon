@@ -75,13 +75,13 @@ export function TopBar({ title, subtitle, right, style = {} }) {
 export function BackChip({ onClick, label = 'Back' }) {
   return <button onClick={onClick} style={{
     appearance:'none',
-    border:'1px solid rgba(184,147,90,0.45)',
-    background:'linear-gradient(180deg, #FDFBF5 0%, #EFEBE0 100%)',
+    border:'none',
+    background: T.ink,
     padding:'9px 14px', borderRadius:6, cursor:'pointer',
     fontFamily: FL, fontSize:10, letterSpacing:'0.2em',
-    textTransform:'uppercase', color: T.ink, fontWeight:600,
+    textTransform:'uppercase', color: T.bg, fontWeight:600,
     display:'flex', alignItems:'center', gap:5,
-    boxShadow:'inset 0 1px 0 rgba(255,255,255,0.7), 0 1px 3px rgba(20,17,13,0.12)',
+    boxShadow:'0 2px 6px rgba(20,17,13,0.18)',
   }}>← {label}</button>;
 }
 

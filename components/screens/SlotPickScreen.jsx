@@ -1,11 +1,12 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import { BackChip, PlayerBadge, SectionLabel, TopBar } from '@/components/ui/primitives';
-import { FB, FD, FI, FL, T } from '@/lib/constants';
-import { buildSlotPickOrder } from '@/lib/utils';
+import { FB, FD, FI, FL, SERIES, T } from '@/lib/constants';
+import { buildSlotPickOrder, getWeekConfig } from '@/lib/utils';
 
 export default function SlotPickScreen({ state, setState, me, onNav }) {
   const { players, weeklyResults, currentWeek, draftState } = state;
+  const cfg = getWeekConfig(state, currentWeek);
   const pickOrder = buildSlotPickOrder(players, weeklyResults, currentWeek - 1);
   const idx = draftState.slotPickIdx;
   const picker = pickOrder[idx];
@@ -78,6 +79,18 @@ export default function SlotPickScreen({ state, setState, me, onNav }) {
         <div style={{ fontFamily: FD, fontSize:20, fontStyle:'italic', color:'rgba(247,244,237,0.5)' }}>{idx}/{players.length}</div>
       </div>
     </div>
+
+    {cfg.bonusSeries.length > 0 && <div style={{ padding:'0 20px 14px' }}>
+      <div style={{
+        background: T.card, border:`1px solid rgba(184,147,90,0.3)`, borderRadius:4,
+        padding:'12px 14px',
+      }}>
+        <div style={{ fontFamily: FL, fontSize:9, fontWeight:600, letterSpacing:'0.22em', textTransform:'uppercase', color: T.hot }}>Bonus Week</div>
+        <div style={{ fontFamily: FB, fontSize:13, fontWeight:500, color: T.ink, marginTop:6, lineHeight:1.5 }}>
+          Each player drafts {cfg.totalPicks} drivers this week — {Object.entries(cfg.allotments).map(([s, n]) => `${n} ${SERIES[s]?.label || s}`).join(' + ')}.
+        </div>
+      </div>
+    </div>}
 
     <SectionLabel right={weeklyResults.length === 0
       ? <span style={{ fontFamily: FI, fontStyle:'italic', fontSize:11, textTransform:'none', letterSpacing:'0.01em', color: T.mute }}>Week 1 · alphabetical</span>

@@ -4,11 +4,11 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useLeague } from '@/lib/useLeague';
 import { useGlobalStyles } from '@/lib/globalStyles';
 import {
-  T, FI, ADMIN_ID, ADMIN_PROFILE, CANONICAL_PLAYERS, ROUNDS_PER_WEEK,
+  T, FI, ADMIN_ID, ADMIN_PROFILE, CANONICAL_PLAYERS,
 } from '@/lib/constants';
 import { DEFAULT_DRIVERS, DEFAULT_SCHEDULE } from '@/lib/data';
 import {
-  buildSlotPickOrder, buildSnakeOrder, computeStandings, makeFreshState,
+  buildSlotPickOrder, buildSnakeOrder, computeStandings, getWeekConfig, makeFreshState,
 } from '@/lib/utils';
 import {
   AppFrame, TabBar, OnTheClockBanner, PullToRefresh, SaveBanner, YourTurnToast,
@@ -52,6 +52,9 @@ function migrateState(rawState) {
   const patched = { ...rawState };
   patched.schedule = DEFAULT_SCHEDULE;
   patched.weekDriversExtra = patched.weekDriversExtra || {};
+  // Ensure bonus structures exist so screens can read them without optional chaining.
+  patched.bonusDriversByWeek = patched.bonusDriversByWeek || {};
+  patched.weekConfig = patched.weekConfig || {};
   const wkExtras = patched.weekDriversExtra[patched.currentWeek] || [];
   patched.drivers = [...DEFAULT_DRIVERS, ...wkExtras];
 
@@ -84,7 +87,8 @@ function detectActiveTurn(state) {
     if (picker) return { kind: 'slot', playerId: picker.id, name: picker.name };
   }
   if (ds.phase === 'snake') {
-    const order = buildSnakeOrder(state.players, ds.slotAssign, ROUNDS_PER_WEEK);
+    const cfg = getWeekConfig(state, state.currentWeek);
+    const order = buildSnakeOrder(state.players, ds.slotAssign, cfg.totalPicks);
     const onClock = order[ds.picks.length];
     if (onClock?.playerId) {
       const player = state.players.find(p => p.id === onClock.playerId);
@@ -152,8 +156,6 @@ export default function App() {
     } else if (id === 'drivers') {
       driversReturnRef.current = (screen === 'draft' || screen === 'slot') ? 'draft' : 'more';
       setScreen('drivers');
-    } else if (id === 'switch') {
-      setScreen('switch');
     } else {
       setScreen(id);
     }
@@ -221,7 +223,7 @@ export default function App() {
     schedule:        <ScheduleScreen      state={state} onBack={() => setScreen('more')}/>,
     history:         <HistoryScreen       state={state} me={me} onBack={() => setScreen('more')} onEdit={(wk) => { setEditingWeek(wk); setScreen('edit-results'); }}/>,
     rules:           <RulesScreen         state={state} onBack={() => setScreen('more')}/>,
-    drivers:         <ManageDriversScreen state={state} setState={setState} onBack={() => onNav(driversReturnRef.current === 'draft' ? 'draft' : 'more')}/>,
+    drivers:         <ManageDriversScreen state={state} setState={setState} me={me} onBack={() => onNav(driversReturnRef.current === 'draft' ? 'draft' : 'more')}/>,
   };
 
   return <AppFrame>

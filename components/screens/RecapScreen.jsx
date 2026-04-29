@@ -1,13 +1,45 @@
 'use client';
 import React from 'react';
 import { BackChip, CarNum, PlayerBadge, SectionLabel, TopBar } from '@/components/ui/primitives';
-import { FB, FD, FI, FL, T } from '@/lib/constants';
+import { FB, FD, FI, FL, SERIES, T } from '@/lib/constants';
 import { DEFAULT_DRIVERS } from '@/lib/data';
 import { downloadShareCard } from '@/lib/shareCard';
 
+// Resolve a pick → driver definition with series awareness. Cup picks come
+// from the default pool + this week's one-off Cup adds. Bonus picks come from
+// the per-week bonus pool. Falls back to a stub from pick.driverName if the
+// pool entry was later removed.
+function resolveDriver(state, wk, pk) {
+  const series = pk.series || 'Cup';
+  if (series === 'Cup') {
+    const wkExtras = (state.weekDriversExtra || {})[wk] || [];
+    const cup = [...DEFAULT_DRIVERS, ...wkExtras];
+    return cup.find(d => d.num === pk.driverNum) || stub(pk);
+  }
+  const pool = state.bonusDriversByWeek?.[wk]?.[series] || [];
+  return pool.find(d => d.num === pk.driverNum) || stub(pk);
+}
+function stub(pk) {
+  return {
+    num: pk.driverNum, name: pk.driverName || `#${pk.driverNum}`,
+    primary: '#7A7268', secondary: '#3D3934', team: '—',
+  };
+}
+
+function SeriesTag({ series }) {
+  if (!series || series === 'Cup') return null;
+  const meta = SERIES[series] || { short: series.slice(0,3).toUpperCase() };
+  return <span style={{
+    display:'inline-block', padding:'1px 4px', borderRadius:2,
+    background: T.hot, color:'#fff',
+    fontFamily: FL, fontSize:7, fontWeight:700,
+    letterSpacing:'0.16em', textTransform:'uppercase',
+    verticalAlign:'middle', marginLeft:3,
+  }}>{meta.short}</span>;
+}
+
 export default function RecapScreen({ state, onNav }) {
   const { players, weeklyResults, draftHistory = [] } = state;
-  const drivers = [...DEFAULT_DRIVERS, ...Object.values(state.weekDriversExtra || {}).flat()];
   if (weeklyResults.length === 0) {
     return <div style={{ paddingBottom:20 }}>
       <TopBar title="Race Recap" right={<BackChip onClick={() => onNav('more')}/>}/>
@@ -30,14 +62,19 @@ export default function RecapScreen({ state, onNav }) {
     const payload = {
       meta: { wk: last.wk, raceName: raceMeta?.raceName, track: last.track },
       players: sortedRes.map(p => {
-        const roster = hist
-          ? hist.picks.filter(pk => pk.playerId === p.id).map(pk => drivers.find(d => d.num === pk.driverNum)).filter(Boolean)
-          : [];
+        const myPicks = hist ? hist.picks.filter(pk => pk.playerId === p.id) : [];
         return {
           name: p.name,
           color: p.color,
           pts: p.pts,
-          drivers: roster.map(d => ({ num: d.num, name: d.name, primary: d.primary, secondary: d.secondary })),
+          drivers: myPicks.map(pk => {
+            const d = resolveDriver(state, last.wk, pk);
+            return {
+              num: d.num, name: d.name,
+              primary: d.primary, secondary: d.secondary,
+              series: pk.series || 'Cup',
+            };
+          }),
         };
       }),
     };
@@ -67,8 +104,8 @@ export default function RecapScreen({ state, onNav }) {
 
       <button onClick={onShare} style={{
         appearance:'none', width:'100%', marginTop:12,
-        background:'transparent', color: T.ink,
-        border:`0.5px solid ${T.ink}`, borderRadius:3,
+        background: T.hot, color: T.ink,
+        border:'none', borderRadius:3,
         padding:'12px 14px', cursor:'pointer',
         fontFamily: FL, fontSize:11, fontWeight:600,
         letterSpacing:'0.24em', textTransform:'uppercase',
@@ -110,10 +147,14 @@ export default function RecapScreen({ state, onNav }) {
                 <span style={{ fontFamily: FD, fontSize:16, fontWeight:600, letterSpacing:'-0.03em' }}>{p.name}</span>
                 <span style={{ marginLeft:'auto', fontFamily: FB, fontSize:14, fontWeight:500, fontVariantNumeric:'tabular-nums' }}>{last.pts[p.id] || 0} pts</span>
               </div>
-              <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
-                {roster.map(pk => {
-                  const d = drivers.find(dv => dv.num === pk.driverNum);
-                  return d && <CarNum key={pk.driverNum} driver={d} size={26}/>;
+              <div style={{ display:'flex', gap:5, flexWrap:'wrap', alignItems:'center' }}>
+                {roster.map((pk, pi) => {
+                  const d = resolveDriver(state, last.wk, pk);
+                  const series = pk.series || 'Cup';
+                  return <span key={`${series}:${pk.driverNum}:${pi}`} style={{ display:'inline-flex', alignItems:'center' }}>
+                    <CarNum driver={d} size={26}/>
+                    <SeriesTag series={series}/>
+                  </span>;
                 })}
               </div>
             </div>;

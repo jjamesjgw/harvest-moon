@@ -50,8 +50,8 @@ export default function RulesScreen({ state, onBack }) {
         {totalRaces} NASCAR Cup Series races, mid-February through November.
       </Rule>
       <Rule term="Roster Size">
-        {ROUNDS_PER_WEEK} drivers per player per week. With {playerCount} players that's {totalPicks} picks
-        every week — each driver belongs to exactly one player for that race.
+        {ROUNDS_PER_WEEK} Cup drivers per player per week. With {playerCount} players that's {totalPicks} Cup picks
+        most weeks — each driver belongs to exactly one player for that race.
       </Rule>
       <Rule term="Re-Draft Each Week">
         Rosters reset every week. After Save & Advance locks the previous race,
@@ -59,7 +59,31 @@ export default function RulesScreen({ state, onBack }) {
       </Rule>
       <Rule term="Scoring" last>
         Official NASCAR Cup Series points. The commissioner enters each driver's
-        race result; the app totals each player's roster automatically.
+        race result; the app totals each player's roster automatically. Bonus picks
+        count toward the same weekly total as Cup picks.
+      </Rule>
+    </div>
+
+    <SectionLabel>Bonus Weeks</SectionLabel>
+    <div style={{ padding:'8px 20px 20px' }}>
+      <Rule term="What They Are">
+        Some weekends have a supplemental race we draft from — a Truck race, an O'Reilly
+        Series race, or a High Limit dirt race. On those weeks, every player picks one
+        bonus driver from each scheduled bonus series in addition to their {ROUNDS_PER_WEEK} Cup drivers.
+      </Rule>
+      <Rule term="When They Happen">
+        Texas weekend (3 bonus series — Truck, O'Reilly, High Limit), Sonoma (O'Reilly),
+        N. Wilkesboro (Truck), and Daytona summer (O'Reilly).
+      </Rule>
+      <Rule term="How They're Drafted">
+        The snake draft just runs more rounds. When it's your turn, you pick from any
+        series you still have allotment for — Cup or any bonus series. You can take all
+        Cup first then bonuses, or interleave however you want. Each series has its own
+        driver pool.
+      </Rule>
+      <Rule term="Scoring" last>
+        Bonus driver points get entered the same way Cup points are. They roll up into
+        your weekly total and your season standings exactly like Cup picks.
       </Rule>
     </div>
 

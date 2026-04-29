@@ -1,16 +1,33 @@
 'use client';
 import React, { useState } from 'react';
 import { BackChip, CarNum, LabeledInput, PlayerBadge, SectionLabel, TopBar } from '@/components/ui/primitives';
-import { ADMIN_ID, FB, FD, FI, FL, FM, T } from '@/lib/constants';
+import { ADMIN_ID, FB, FD, FI, FL, FM, SERIES, T } from '@/lib/constants';
 import { DEFAULT_DRIVERS } from '@/lib/data';
+import { getBonusPool, getWeekConfig } from '@/lib/utils';
 
-// Recompute the per-player rollup for a given week using its driverPoints + bonuses + overrides.
-// This is invoked on every entry so live standings stay correct, not just on Save & Advance.
+// Composite key for driverPoints. For weeks PRE-bonus-rollout, picks lacked
+// `series` and driverPoints was keyed by raw num. We support both formats:
+// reads check both, writes always use the new composite form.
+const ptsKey = (series, num) => `${series || 'Cup'}:${num}`;
+const lookupPts = (driverPoints, series, num) => {
+  const k = ptsKey(series, num);
+  if (Object.prototype.hasOwnProperty.call(driverPoints, k)) return driverPoints[k];
+  // Legacy fallback: old shape used flat num keys (only Cup picks existed).
+  if ((series || 'Cup') === 'Cup' && Object.prototype.hasOwnProperty.call(driverPoints, num)) {
+    return driverPoints[num];
+  }
+  return undefined;
+};
+
+// Per-player rollup. Sums the points of every drafted driver, plus optional
+// bonuses, plus optional overrides. Bonus picks count exactly the same as Cup
+// picks toward the player's weekly total — they're indistinguishable in the
+// math, just stored under different driverPoints keys.
 function rollupPts(players, picks, driverPoints = {}, bonuses = {}, overrides = {}) {
   const pts = {};
   players.forEach(p => {
-    const nums = picks.filter(pk => pk.playerId === p.id).map(pk => pk.driverNum);
-    const base = nums.reduce((sum, n) => sum + (driverPoints[n] || 0), 0);
+    const myPicks = picks.filter(pk => pk.playerId === p.id);
+    const base = myPicks.reduce((sum, pk) => sum + (lookupPts(driverPoints, pk.series, pk.driverNum) || 0), 0);
     const b = bonuses[p.id] || 0;
     const o = overrides[p.id];
     pts[p.id] = o != null ? o : (base + b);
@@ -19,12 +36,10 @@ function rollupPts(players, picks, driverPoints = {}, bonuses = {}, overrides = 
 }
 
 export default function EnterResultsScreen({ state, setState, me, onNav, editWeek }) {
-  // editWeek (optional) — when provided, admin is editing a past finalized week
-  // instead of entering the current one. Targeted picks come from draftHistory.
   const targetWeek = editWeek || state.currentWeek;
   const isPastEdit = editWeek != null && editWeek !== state.currentWeek;
 
-  const { players, drivers, schedule, weeklyResults, draftState, draftHistory = [] } = state;
+  const { players, schedule, weeklyResults, draftState, draftHistory = [] } = state;
   const currentRace = schedule.find(s => s.wk === targetWeek);
   const isAdmin = me.id === ADMIN_ID;
 
@@ -33,26 +48,46 @@ export default function EnterResultsScreen({ state, setState, me, onNav, editWee
   const bonuses = existing?.bonuses || {};
   const overrides = existing?.overrides || {};
 
-  // For past edits, draft data lives in draftHistory; for current week, in draftState.
+  // Picks for this week. New format includes `series`; old format omitted it
+  // (defaults to 'Cup').
   const picks = isPastEdit
     ? (draftHistory.find(h => h.wk === targetWeek)?.picks || [])
     : (draftState?.picks || []);
 
-  const draftedNums = [...new Set(picks.map(p => p.driverNum))];
-  const draftedDrivers = draftedNums
-    .map(n => drivers.find(d => d.num === n))
-    .filter(Boolean)
-    .sort((a, b) => a.num - b.num);
+  // Build the canonical drafted-driver list for this week, grouped by series.
+  // We resolve each pick to its driver definition (Cup → DEFAULT_DRIVERS +
+  // weekly extras; bonus → bonusDriversByWeek). If we can't resolve, we
+  // synthesize a stub from the pick's `driverName` snapshot.
+  const wkExtras = (state.weekDriversExtra || {})[targetWeek] || [];
+  const cupPool = [...DEFAULT_DRIVERS, ...wkExtras];
 
-  // Display totals — recomputed on render so live values track inputs exactly.
+  const draftedBySeries = {};
+  picks.forEach(pk => {
+    const series = pk.series || 'Cup';
+    const pool = series === 'Cup' ? cupPool : getBonusPool(state, targetWeek, series);
+    const d = pool.find(x => x.num === pk.driverNum) || {
+      num: pk.driverNum,
+      name: pk.driverName || `#${pk.driverNum}`,
+      team: '—', primary: T.mute, secondary: T.ink,
+    };
+    if (!draftedBySeries[series]) draftedBySeries[series] = [];
+    if (!draftedBySeries[series].some(x => x.num === d.num)) {
+      draftedBySeries[series].push(d);
+    }
+  });
+  Object.values(draftedBySeries).forEach(list => list.sort((a, b) => a.num - b.num));
+
   const totals = rollupPts(players, picks, driverPoints, bonuses, overrides);
   const bases = {};
   players.forEach(p => {
-    const nums = picks.filter(pk => pk.playerId === p.id).map(pk => pk.driverNum);
-    bases[p.id] = nums.reduce((s, n) => s + (driverPoints[n] || 0), 0);
+    const myPicks = picks.filter(pk => pk.playerId === p.id);
+    bases[p.id] = myPicks.reduce((s, pk) => s + (lookupPts(driverPoints, pk.series, pk.driverNum) || 0), 0);
   });
 
-  // ALWAYS recomputes pts so non-admins' standings views stay consistent during entry.
+  const totalEntries = Object.keys(driverPoints).length;
+  const totalDrafted = Object.values(draftedBySeries).reduce((s, list) => s + list.length, 0);
+
+  // Live patch — every keystroke recomputes pts so non-admin standings stay current.
   const patchWeek = (updates) => {
     setState(s => {
       const ex = s.weeklyResults.find(w => w.wk === targetWeek) || {};
@@ -72,9 +107,12 @@ export default function EnterResultsScreen({ state, setState, me, onNav, editWee
     });
   };
 
-  const setDriverPts = (num, val) => {
+  const setDriverPts = (series, num, val) => {
     const next = { ...driverPoints };
-    if (val === '') delete next[num]; else next[num] = parseInt(val) || 0;
+    const k = ptsKey(series, num);
+    // Also clear any legacy flat-num key so the two don't drift.
+    if ((series || 'Cup') === 'Cup' && Object.prototype.hasOwnProperty.call(next, num)) delete next[num];
+    if (val === '') delete next[k]; else next[k] = parseInt(val) || 0;
     patchWeek({ driverPoints: next });
   };
   const setBonus = (pid, val) => {
@@ -89,7 +127,6 @@ export default function EnterResultsScreen({ state, setState, me, onNav, editWee
     patchWeek({ overrides: next });
   };
 
-  // Two-tap confirmation: arm on first tap, fire on second within 3s.
   const [advanceArm, setAdvanceArm] = useState(false);
   const saveAndAdvance = () => {
     if (!advanceArm) {
@@ -111,7 +148,11 @@ export default function EnterResultsScreen({ state, setState, me, onNav, editWee
       const newRes = { ...ex, wk: s.currentWeek, track, pts, finalized: true };
       const draftHistory = [...(s.draftHistory || [])];
       if (s.draftState?.picks?.length > 0 && !draftHistory.find(h => h.wk === s.currentWeek)) {
-        draftHistory.push({ wk: s.currentWeek, track, slotAssign: s.draftState.slotAssign, picks: s.draftState.picks });
+        draftHistory.push({
+          wk: s.currentWeek, track,
+          slotAssign: s.draftState.slotAssign,
+          picks: s.draftState.picks, // includes series + driverName per pick
+        });
       }
       const nextWeek = s.currentWeek + 1;
       const hasNext = !!s.schedule.find(sc => sc.wk === nextWeek);
@@ -129,7 +170,11 @@ export default function EnterResultsScreen({ state, setState, me, onNav, editWee
   };
 
   const sorted = [...players].sort((a, b) => (totals[b.id] || 0) - (totals[a.id] || 0));
-  const anyEntered = Object.keys(driverPoints).length > 0 || Object.keys(overrides).length > 0;
+  const anyEntered = totalEntries > 0 || Object.keys(overrides).length > 0;
+
+  // Render order — Cup first, then bonus series in config order
+  const cfg = getWeekConfig(state, targetWeek);
+  const seriesRenderOrder = Object.keys(cfg.allotments).filter(s => draftedBySeries[s]);
 
   return <div style={{ paddingBottom:20 }}>
     <TopBar
@@ -147,46 +192,59 @@ export default function EnterResultsScreen({ state, setState, me, onNav, editWee
           {isAdmin
             ? (isPastEdit
                 ? 'Updating a past week. Standings recalculate automatically. Tap Done when finished.'
-                : 'Enter each drafted driver\u2019s Cup points from nascar.com. Totals update live. Use Bonus for other-series drivers, Override to set a final number.')
-            : 'Admin will enter driver points after the race.'}
+                : `Enter each drafted driver's points. Bonus picks count toward the same weekly total as Cup picks. Override sets a final number.`)
+            : 'Admin will enter driver points after each race.'}
         </div>
       </div>
     </div>
 
-    {draftedDrivers.length > 0 && <>
-      <SectionLabel right={isAdmin ? <span style={{ fontFamily: FI, fontStyle:'italic', fontSize:12, textTransform:'none', letterSpacing:'0.01em', color: T.mute }}>{Object.keys(driverPoints).length}/{draftedDrivers.length} entered</span> : null}>Driver Points</SectionLabel>
-      <div style={{ padding:'14px 20px 20px' }}>
-        {draftedDrivers.map((d, i) => {
-          const owners = picks.filter(pk => pk.driverNum === d.num).map(pk => players.find(p => p.id === pk.playerId)).filter(Boolean);
-          return <div key={d.num} style={{
-            display:'flex', alignItems:'center', gap:12,
-            padding:'12px 0',
-            borderBottom: i === draftedDrivers.length-1 ? 'none' : `0.5px solid ${T.line2}`,
-          }}>
-            <CarNum driver={d} size={34}/>
-            <div style={{ flex:1, minWidth:0 }}>
-              <div style={{ fontFamily: FD, fontSize:16, fontWeight:600, letterSpacing:'-0.03em', lineHeight:1.1 }}>{d.name}</div>
-              <div style={{ display:'flex', alignItems:'center', gap:4, marginTop:4, flexWrap:'wrap' }}>
-                {owners.map((o, oi) => <span key={o.id+oi} style={{ display:'inline-flex', alignItems:'center', gap:4 }}>
-                  <PlayerBadge player={o} size={14}/>
-                  <span style={{ fontFamily: FI, fontStyle:'italic', fontSize:11, color: T.mute }}>{o.name}</span>
-                </span>)}
+    {seriesRenderOrder.map(series => {
+      const list = draftedBySeries[series];
+      const meta = SERIES[series] || { label: series };
+      const enteredHere = list.filter(d => lookupPts(driverPoints, series, d.num) != null).length;
+      return <div key={series}>
+        <SectionLabel right={isAdmin
+          ? <span style={{ fontFamily: FI, fontStyle:'italic', fontSize:12, textTransform:'none', letterSpacing:'0.01em', color: T.mute }}>{enteredHere}/{list.length} entered</span>
+          : null
+        }>{meta.label} Points</SectionLabel>
+        <div style={{ padding:'14px 20px 20px' }}>
+          {list.map((d, i) => {
+            const owners = picks
+              .filter(pk => pk.driverNum === d.num && (pk.series || 'Cup') === series)
+              .map(pk => players.find(p => p.id === pk.playerId))
+              .filter(Boolean);
+            return <div key={`${series}:${d.num}`} style={{
+              display:'flex', alignItems:'center', gap:12,
+              padding:'12px 0',
+              borderBottom: i === list.length-1 ? 'none' : `0.5px solid ${T.line2}`,
+            }}>
+              <CarNum driver={d} size={34}/>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontFamily: FD, fontSize:16, fontWeight:600, letterSpacing:'-0.03em', lineHeight:1.1 }}>{d.name}</div>
+                <div style={{ display:'flex', alignItems:'center', gap:4, marginTop:4, flexWrap:'wrap' }}>
+                  {owners.map((o, oi) => <span key={o.id+oi} style={{ display:'inline-flex', alignItems:'center', gap:4 }}>
+                    <PlayerBadge player={o} size={14}/>
+                    <span style={{ fontFamily: FI, fontStyle:'italic', fontSize:11, color: T.mute }}>{o.name}</span>
+                  </span>)}
+                </div>
               </div>
-            </div>
-            <input type="number" inputMode="numeric" value={driverPoints[d.num] ?? ''} onChange={e => setDriverPts(d.num, e.target.value)}
-              disabled={!isAdmin}
-              placeholder="—"
-              style={{
-                width:72, textAlign:'right', padding:'9px 10px',
-                border:`0.5px solid ${T.line}`, borderRadius:3,
-                background: isAdmin ? T.card : T.bg2,
-                outline:'none', color: T.ink,
-                fontFamily: FB, fontSize:16, fontWeight:600, fontVariantNumeric:'tabular-nums',
-              }}/>
-          </div>;
-        })}
-      </div>
-    </>}
+              <input type="number" inputMode="numeric"
+                value={lookupPts(driverPoints, series, d.num) ?? ''}
+                onChange={e => setDriverPts(series, d.num, e.target.value)}
+                disabled={!isAdmin}
+                placeholder="—"
+                style={{
+                  width:72, textAlign:'right', padding:'9px 10px',
+                  border:`1px solid ${T.line}`, borderRadius:3,
+                  background: isAdmin ? T.card : T.bg2,
+                  outline:'none', color: T.ink,
+                  fontFamily: FB, fontSize:16, fontWeight:600, fontVariantNumeric:'tabular-nums',
+                }}/>
+            </div>;
+          })}
+        </div>
+      </div>;
+    })}
 
     <SectionLabel>Standings · This Week</SectionLabel>
     <div style={{ padding:'14px 20px 20px' }}>
@@ -224,7 +282,7 @@ export default function EnterResultsScreen({ state, setState, me, onNav, editWee
         background: advanceArm ? T.hot : T.ink,
         color: advanceArm ? T.ink : T.bg,
         border:'none', borderRadius:3, cursor:'pointer',
-        fontFamily: FL, fontSize:11, fontWeight:500,
+        fontFamily: FL, fontSize:11, fontWeight:600,
         letterSpacing:'0.24em', textTransform:'uppercase',
       }}>{advanceArm
         ? `Tap again to confirm — locks Wk ${String(state.currentWeek).padStart(2,'0')}`
@@ -238,7 +296,7 @@ export default function EnterResultsScreen({ state, setState, me, onNav, editWee
       <button onClick={() => onNav('history')} style={{
         appearance:'none', width:'100%', padding:16,
         background: T.ink, color: T.bg, border:'none', borderRadius:3, cursor:'pointer',
-        fontFamily: FL, fontSize:11, fontWeight:500,
+        fontFamily: FL, fontSize:11, fontWeight:600,
         letterSpacing:'0.24em', textTransform:'uppercase',
       }}>Done · Back to History</button>
     </div>}

@@ -2,8 +2,8 @@
 import React from 'react';
 import { PlayerBadge, RaceCountdown, SectionLabel, TopBar, WinsCount } from '@/components/ui/primitives';
 import { InstallHint } from '@/components/ui/InstallHint';
-import { ADMIN_ID, FB, FD, FI, FL, ROUNDS_PER_WEEK, T } from '@/lib/constants';
-import { computeStandings, ordinalSuffix, raceCountdown } from '@/lib/utils';
+import { ADMIN_ID, FB, FD, FI, FL, T } from '@/lib/constants';
+import { computeStandings, getWeekConfig, ordinalSuffix, raceCountdown } from '@/lib/utils';
 
 export default function HomeScreen({ state, me, onNav }) {
   const { players, schedule, currentWeek, weeklyResults, draftState } = state;
@@ -21,7 +21,8 @@ export default function HomeScreen({ state, me, onNav }) {
   const upcoming = schedule.filter(s => s.wk > currentWeek).slice(0, 2);
 
   const phase = draftState?.phase || 'not-started';
-  const totalPicks = ROUNDS_PER_WEEK * players.length;
+  const cfg = getWeekConfig(state, currentWeek);
+  const totalPicks = cfg.totalPicks * players.length;
   const pickCount = draftState?.picks?.length || 0;
   const draftComplete = phase === 'done' || pickCount >= totalPicks;
 

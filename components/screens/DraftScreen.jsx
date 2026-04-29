@@ -1,14 +1,34 @@
 'use client';
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { BackChip, CarNum, PlayerBadge, SectionLabel, TopBar } from '@/components/ui/primitives';
-import { FD, FI, FL, ROUNDS_PER_WEEK, T } from '@/lib/constants';
-import { buildSnakeOrder, makeDriverWeekData } from '@/lib/utils';
+import { FB, FD, FI, FL, ROUNDS_PER_WEEK, SERIES, T } from '@/lib/constants';
+import { DEFAULT_DRIVERS } from '@/lib/data';
+import {
+  buildSnakeOrder, countPicksBySeries, getBonusPool, getWeekConfig, makeDriverWeekData,
+} from '@/lib/utils';
+
+// Helper: a stable composite key per pick "this driver in this series".
+// Bonus pools can share numbers with Cup drivers (e.g. #7 Heim runs Cup AND
+// Truck), so we can't dedupe by num alone — series + num together are unique.
+const pickKey = (series, num) => `${series}:${num}`;
 
 export default function DraftScreen({ state, setState, me, onNav }) {
-  const { players, drivers, schedule, currentWeek, draftState, adminId } = state;
+  const { players, schedule, currentWeek, draftState, adminId, weekDriversExtra = {} } = state;
   const currentRace = schedule.find(s => s.wk === currentWeek);
   const isAdmin = me.id === adminId;
   const [resetArm, setResetArm] = useState(false);
+
+  // Resolve this week's draft shape from config (allotments per series + total rounds).
+  const cfg = getWeekConfig(state, currentWeek);
+  const totalPicks = cfg.totalPicks * 1; // rounds = total per-player picks
+  const totalDraftPicks = cfg.totalPicks * players.length;
+
+  // Cup driver pool (default 36 + this week's one-offs from Manage Drivers).
+  const cupDrivers = useMemo(() => {
+    const wkExtras = (weekDriversExtra || {})[currentWeek] || [];
+    const merged = [...DEFAULT_DRIVERS, ...wkExtras];
+    return makeDriverWeekData(merged, currentWeek * 100 + merged.length);
+  }, [weekDriversExtra, currentWeek]);
 
   const resetDraft = () => {
     if (!resetArm) { setResetArm(true); setTimeout(() => setResetArm(false), 3000); return; }
@@ -20,34 +40,78 @@ export default function DraftScreen({ state, setState, me, onNav }) {
     onNav('slot');
   };
 
-  // Stable per-week driver data (seeded). We keep the seeded RNG even though
-  // the odds it generates are no longer rendered, because makeDriverWeekData
-  // also produces the recent3/trackAvg fields used by Team's past rosters.
-  const weekDrivers = useMemo(
-    () => makeDriverWeekData(drivers, currentWeek * 100 + drivers.length),
-    [drivers, currentWeek]
-  );
-
-  const snakeOrder = buildSnakeOrder(players, draftState.slotAssign, ROUNDS_PER_WEEK);
-
+  // The snake order is now `cfg.totalPicks` rounds long (was hardcoded ROUNDS_PER_WEEK).
+  const snakeOrder = buildSnakeOrder(players, draftState.slotAssign, cfg.totalPicks);
   const pickIdx = draftState.picks.length;
-  const totalPicks = ROUNDS_PER_WEEK * players.length;
-  const done = pickIdx >= totalPicks;
+  const done = pickIdx >= totalDraftPicks;
   const onClock = done ? null : snakeOrder[pickIdx];
   const currentPicker = onClock ? players.find(p => p.id === onClock.playerId) : null;
   const myTurn = currentPicker && currentPicker.id === me.id;
+  const canPick = onClock && (onClock.playerId === me.id || isAdmin);
 
-  const pickedNums = new Set(draftState.picks.map(p => p.driverNum));
+  // Track picks as series-scoped to allow same driver number across series.
+  const pickedKeys = useMemo(
+    () => new Set(draftState.picks.map(p => pickKey(p.series || 'Cup', p.driverNum))),
+    [draftState.picks]
+  );
 
+  // Which series tab is currently selected. Defaults to first available
+  // series for the current picker.
+  const pickerId = onClock?.playerId;
+  const remainingForPicker = (s) => {
+    if (!pickerId) return 0;
+    const used = countPicksBySeries(draftState.picks, pickerId, s);
+    return (cfg.allotments[s] || 0) - used;
+  };
+  const orderedSeries = Object.keys(cfg.allotments); // Cup first, then bonus order from config
+  const defaultSeries = orderedSeries.find(s => remainingForPicker(s) > 0) || 'Cup';
+  const [activeSeries, setActiveSeries] = useState(defaultSeries);
+
+  // Reset the active series tab to Cup whenever the picker changes — keeps
+  // the next person from inheriting the previous picker's tab choice. If
+  // Cup is already maxed for them (rare — only at the tail of a non-bonus
+  // week pure-Cup snake), fall through to the next available series.
+  useEffect(() => {
+    if (!pickerId) return;
+    const cupRemaining = remainingForPicker('Cup');
+    if (cupRemaining > 0) {
+      setActiveSeries('Cup');
+      return;
+    }
+    const nextAvailable = orderedSeries.find(s => remainingForPicker(s) > 0);
+    if (nextAvailable) setActiveSeries(nextAvailable);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pickerId]);
+
+  // Within a single picker's turn — if they hit the max in the active series
+  // (e.g. fourth Cup pick locks Cup), auto-snap to the next available bucket.
+  useEffect(() => {
+    if (remainingForPicker(activeSeries) <= 0) {
+      const nextAvailable = orderedSeries.find(s => remainingForPicker(s) > 0);
+      if (nextAvailable) setActiveSeries(nextAvailable);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftState.picks.length]);
+
+  // Resolve driver pool for the active series.
+  const activePool = activeSeries === 'Cup' ? cupDrivers : getBonusPool(state, currentWeek, activeSeries);
+
+  // Pick action — locks the driver into the current pick slot.
   const pick = (driver) => {
-    if (done || pickedNums.has(driver.num) || !onClock) return;
-    if (onClock.playerId !== me.id && me.id !== adminId) return; // on-the-clock player or admin only
+    if (done || !onClock || !canPick) return;
+    if (pickedKeys.has(pickKey(activeSeries, driver.num))) return;
+    if (remainingForPicker(activeSeries) <= 0) return;
     const newPicks = [...draftState.picks, {
-      driverNum: driver.num, playerId: onClock.playerId,
-      round: onClock.round, slot: onClock.slot, at: Date.now(),
+      driverNum: driver.num,
+      driverName: driver.name, // snapshot for history when bonus drivers go away later
+      series: activeSeries,
+      playerId: onClock.playerId,
+      round: onClock.round,
+      slot: onClock.slot,
+      at: Date.now(),
     }];
-    const nextRound = snakeOrder[newPicks.length]?.round || ROUNDS_PER_WEEK;
-    const completing = newPicks.length >= totalPicks;
+    const completing = newPicks.length >= totalDraftPicks;
+    const nextRound = snakeOrder[newPicks.length]?.round || cfg.totalPicks;
     setState(s => ({
       ...s,
       draftState: {
@@ -76,59 +140,91 @@ export default function DraftScreen({ state, setState, me, onNav }) {
         right={<BackChip onClick={() => onNav('home')} label="Exit"/>}
       />
       <div style={{ padding:'0 20px 4px' }}>
-        <OnTheClock currentPicker={currentPicker} pickIdx={pickIdx} totalPicks={totalPicks} round={onClock?.round} myTurn={myTurn} done={done}/>
+        <OnTheClock
+          currentPicker={currentPicker}
+          pickIdx={pickIdx}
+          totalPicks={totalDraftPicks}
+          round={onClock?.round}
+          totalRounds={cfg.totalPicks}
+          myTurn={myTurn}
+          done={done}
+        />
       </div>
+
+      {!done && cfg.bonusSeries.length > 0 && currentPicker && <SeriesTabs
+        cfg={cfg}
+        picks={draftState.picks}
+        pickerId={currentPicker.id}
+        active={activeSeries}
+        onSelect={setActiveSeries}
+        bonusPools={state.bonusDriversByWeek?.[currentWeek] || {}}
+      />}
 
       {!done && <div style={{ padding:'10px 20px 0', display:'flex', gap:6, justifyContent:'flex-end' }}>
         {pickIdx > 0 && (() => {
           const lastPick = draftState.picks[draftState.picks.length - 1];
-          const canUndo = lastPick && (lastPick.playerId === me.id || me.id === adminId);
+          const canUndo = lastPick && (lastPick.playerId === me.id || isAdmin);
           if (!canUndo) return null;
           return <button onClick={undo} style={{
             appearance:'none',
-            background:'transparent', color: T.mute,
-            border: `0.5px solid ${T.line}`,
-            padding:'7px 12px', borderRadius:3, cursor:'pointer',
-            fontFamily: FL, fontSize:10, fontWeight:500,
+            background: T.ink, color: T.bg,
+            border:'none',
+            padding:'8px 14px', borderRadius:3, cursor:'pointer',
+            fontFamily: FL, fontSize:10, fontWeight:600,
             letterSpacing:'0.2em', textTransform:'uppercase',
           }}>↶ Undo my pick</button>;
         })()}
         {isAdmin && (pickIdx > 0 || Object.keys(draftState.slotAssign).length > 0) && <button onClick={resetDraft} style={{
           appearance:'none',
-          background: resetArm ? T.hot : 'transparent',
-          color: resetArm ? T.ink : T.hot,
-          border: `0.5px solid ${T.hot}`,
-          padding:'7px 12px', borderRadius:3, cursor:'pointer',
-          fontFamily: FL, fontSize:10, fontWeight:500,
+          background: T.hot, color: T.ink,
+          border:'none',
+          padding:'8px 14px', borderRadius:3, cursor:'pointer',
+          fontFamily: FL, fontSize:10, fontWeight:600,
           letterSpacing:'0.2em', textTransform:'uppercase',
         }}>{resetArm ? 'Tap to confirm' : 'Reset'}</button>}
       </div>}
     </div>
 
-    {!done && <DraftGrid drivers={weekDrivers} pickedNums={pickedNums} draftState={draftState} players={players} currentRace={currentRace} onPick={pick} myTurn={myTurn} />}
-    {!done && <div style={{ padding:'0 20px 24px' }}>
+    {!done && <DraftGrid
+      drivers={activePool}
+      pickedKeys={pickedKeys}
+      activeSeries={activeSeries}
+      draftState={draftState}
+      players={players}
+      onPick={pick}
+      myTurn={myTurn}
+      remaining={remainingForPicker(activeSeries)}
+      isEmpty={activePool.length === 0}
+      isAdmin={isAdmin}
+      onAddDriver={() => onNav('drivers')}
+    />}
+    {!done && activeSeries === 'Cup' && isAdmin && <div style={{ padding:'0 20px 24px' }}>
       <button onClick={() => onNav('drivers')} style={{
         appearance:'none', width:'100%',
-        background:'transparent', border:`0.5px dashed ${T.line}`, borderRadius:8,
+        background: T.ink, color: T.bg,
+        border:'none', borderRadius:3,
         padding:'14px',
-        fontFamily: FL, fontSize:10, fontWeight:500,
-        letterSpacing:'0.22em', textTransform:'uppercase', color: T.ink2, cursor:'pointer',
+        fontFamily: FL, fontSize:10, fontWeight:600,
+        letterSpacing:'0.22em', textTransform:'uppercase',
+        cursor:'pointer',
         display:'flex', alignItems:'center', justifyContent:'center', gap:8,
       }}>
         <span style={{ fontSize:16, lineHeight:1, fontFamily: FD, fontWeight:300 }}>+</span>
-        Add Driver
+        Add Cup Driver
       </button>
     </div>}
 
-    {done && <DraftComplete state={state} onNav={onNav} weekDrivers={weekDrivers} />}
+    {done && <DraftComplete state={state} onNav={onNav} cupDrivers={cupDrivers} />}
   </div>;
 }
 
-function OnTheClock({ currentPicker, pickIdx, totalPicks, round, myTurn, done }) {
+// ── Header banner: who's on the clock + pick count ─────────────────
+function OnTheClock({ currentPicker, pickIdx, totalPicks, round, totalRounds, myTurn, done }) {
   if (done) return <div style={{ background: T.good, color:'#fff', borderRadius:4, padding:'16px 18px' }}>
     <div style={{ fontFamily: FL, fontSize:9, fontWeight:500, letterSpacing:'0.24em', textTransform:'uppercase', color:'rgba(255,255,255,0.75)' }}>Draft Complete</div>
     <div style={{ fontFamily: FD, fontSize:24, fontWeight:600, letterSpacing:'-0.03em', marginTop:2 }}>Roll out the green flag</div>
   </div>;
+  if (!currentPicker) return null;
   return <div style={{
     background: T.ink, color: T.bg, borderRadius:4, padding:'14px 18px',
     display:'flex', alignItems:'center', gap:14,
@@ -137,7 +233,7 @@ function OnTheClock({ currentPicker, pickIdx, totalPicks, round, myTurn, done })
     <PlayerBadge player={currentPicker} size={36}/>
     <div style={{ flex:1, minWidth:0 }}>
       <div style={{ fontFamily: FL, fontSize:9, fontWeight:500, letterSpacing:'0.24em', textTransform:'uppercase', color: myTurn ? T.hot : 'rgba(247,244,237,0.5)' }}>
-        {myTurn ? "You're up" : 'On the Clock'} · Round {round}
+        {myTurn ? "You're up" : 'On the Clock'} · Round {round}/{totalRounds}
       </div>
       <div style={{ fontFamily: FD, fontSize:22, fontWeight:600, lineHeight:1.05, letterSpacing:'-0.03em', marginTop:2 }}>{currentPicker.name}</div>
     </div>
@@ -145,15 +241,87 @@ function OnTheClock({ currentPicker, pickIdx, totalPicks, round, myTurn, done })
   </div>;
 }
 
-function DraftGrid({ drivers, pickedNums, draftState, players, currentRace, onPick, myTurn }) {
+// ── Series tab strip ───────────────────────────────────────────────
+// Shown only on weeks with bonus rounds. Each tab displays "Cup 2/4"
+// where 2 is picks-used by the current picker and 4 is their allotment.
+// Tabs that are maxed are disabled. Tabs whose pool is empty get a hint.
+function SeriesTabs({ cfg, picks, pickerId, active, onSelect, bonusPools }) {
+  return <div style={{ padding:'10px 20px 0' }}>
+    <div style={{
+      display:'flex', gap:6, overflowX:'auto', paddingBottom:6,
+    }}>
+      {Object.entries(cfg.allotments).map(([series, max]) => {
+        const used = countPicksBySeries(picks, pickerId, series);
+        const remaining = max - used;
+        const pool = series === 'Cup' ? null : (bonusPools[series] || []);
+        const poolEmpty = pool && pool.length === 0;
+        const disabled = remaining <= 0 || poolEmpty;
+        const isActive = active === series;
+        const meta = SERIES[series] || { label: series, short: series.slice(0,3).toUpperCase() };
+        return <button
+          key={series}
+          onClick={() => !disabled && onSelect(series)}
+          disabled={disabled}
+          style={{
+            appearance:'none', flexShrink:0,
+            padding:'8px 14px',
+            background: isActive ? T.ink : (disabled ? T.bg2 : T.card),
+            color: isActive ? T.bg : (disabled ? T.mute : T.ink),
+            border:`1px solid ${isActive ? T.ink : T.line}`,
+            borderRadius:3,
+            cursor: disabled ? 'default' : 'pointer',
+            fontFamily: FL, fontSize:10, fontWeight:600,
+            letterSpacing:'0.18em', textTransform:'uppercase',
+            display:'flex', alignItems:'center', gap:8,
+            opacity: disabled ? 0.55 : 1,
+          }}
+          title={poolEmpty ? 'Admin has not added drivers for this series yet' : undefined}
+        >
+          <span>{meta.label}</span>
+          <span style={{ fontFamily: FB, fontSize:11, fontWeight:600, fontVariantNumeric:'tabular-nums', letterSpacing:'-0.01em', color: isActive ? T.hot : T.mute }}>{used}/{max}</span>
+        </button>;
+      })}
+    </div>
+  </div>;
+}
+
+// ── Driver pool grid ───────────────────────────────────────────────
+function DraftGrid({ drivers, pickedKeys, activeSeries, draftState, players, onPick, remaining, isEmpty, isAdmin, onAddDriver }) {
+  if (isEmpty) {
+    const meta = SERIES[activeSeries] || { label: activeSeries };
+    return <div style={{ padding:'24px 20px' }}>
+      <div style={{
+        background: T.card, border:`1px solid ${T.line}`, borderRadius:6,
+        padding:'28px 22px', textAlign:'center',
+      }}>
+        <div style={{ fontFamily: FL, fontSize:9, fontWeight:600, letterSpacing:'0.22em', textTransform:'uppercase', color: T.hot }}>{meta.label}</div>
+        <div style={{ fontFamily: FD, fontSize:18, fontWeight:600, letterSpacing:'-0.02em', marginTop:8, lineHeight:1.3 }}>
+          No drivers added yet
+        </div>
+        <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:13, color: T.mute, marginTop:8, lineHeight:1.5 }}>
+          {isAdmin
+            ? `Add ${meta.label} drivers in Manage Drivers before the league can pick from this series.`
+            : `Waiting on the commissioner to add ${meta.label} drivers.`}
+        </div>
+        {isAdmin && <button onClick={onAddDriver} style={{
+          appearance:'none', marginTop:14,
+          background: T.ink, color: T.bg, border:'none', borderRadius:3,
+          padding:'10px 18px', cursor:'pointer',
+          fontFamily: FL, fontSize:10, fontWeight:600, letterSpacing:'0.22em', textTransform:'uppercase',
+        }}>Manage Drivers →</button>}
+      </div>
+    </div>;
+  }
   return <div>
     <div style={{ height:14 }}/>
-    <SectionLabel right={<span style={{ fontFamily: FI, fontStyle:'italic', fontSize:12, textTransform:'none', letterSpacing:'0.01em', color: T.ink }}>{drivers.filter(d => !pickedNums.has(d.num)).length} available</span>}>Drivers · Tap to Pick</SectionLabel>
+    <SectionLabel right={<span style={{ fontFamily: FI, fontStyle:'italic', fontSize:12, textTransform:'none', letterSpacing:'0.01em', color: T.ink }}>{remaining} left from this series · {drivers.filter(d => !pickedKeys.has(pickKey(activeSeries, d.num))).length} available</span>}>
+      {(SERIES[activeSeries]?.label || activeSeries)} · Tap to Pick
+    </SectionLabel>
     <div style={{ padding:'12px 20px 16px' }}>
       <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:10 }}>
         {drivers.map(d => {
-          const taken = pickedNums.has(d.num);
-          const takenBy = taken ? draftState.picks.find(p => p.driverNum === d.num) : null;
+          const taken = pickedKeys.has(pickKey(activeSeries, d.num));
+          const takenBy = taken ? draftState.picks.find(p => p.driverNum === d.num && (p.series || 'Cup') === activeSeries) : null;
           const takenPl = takenBy ? players.find(p => p.id === takenBy.playerId) : null;
           return <button key={d.num} onClick={() => !taken && onPick(d)} disabled={taken} style={{
             appearance:'none',
@@ -172,12 +340,10 @@ function DraftGrid({ drivers, pickedNums, draftState, players, currentRace, onPi
               : 'inset 0 1px 0 rgba(255,255,255,0.85), 0 2px 6px rgba(20,17,13,0.06), 0 8px 18px rgba(20,17,13,0.05)',
             transition:'transform .12s ease',
           }}>
-            {/* Top livery accent bar */}
             {!taken && <div style={{
               position:'absolute', top:0, left:0, right:0, height:3,
               background: `linear-gradient(90deg, ${d.primary} 0%, ${d.primary} 60%, ${d.secondary || d.primary} 100%)`,
             }}/>}
-            {/* Sheen overlay */}
             {!taken && <div style={{
               position:'absolute', top:0, left:0, right:0, height:'42%',
               background:'linear-gradient(180deg, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0) 100%)',
@@ -207,17 +373,24 @@ function DraftGrid({ drivers, pickedNums, draftState, players, currentRace, onPi
   </div>;
 }
 
-function DraftComplete({ state, onNav, weekDrivers }) {
-  const { players, drivers, draftState } = state;
-  const byPlayer = {};
-  draftState.picks.forEach(p => {
-    (byPlayer[p.playerId] = byPlayer[p.playerId] || []).push(p);
-  });
+// ── Draft-complete summary roster view ─────────────────────────────
+// Now groups picks by series so bonus drivers are visually distinct from
+// Cup picks. Each player shows "Cup [4 chips] · Truck [1 chip] · ..."
+function DraftComplete({ state, onNav, cupDrivers }) {
+  const { players, draftState, currentWeek, bonusDriversByWeek = {} } = state;
+  const cfg = getWeekConfig(state, currentWeek);
+  const bonusPools = bonusDriversByWeek[currentWeek] || {};
+  const lookupDriver = (series, num) => {
+    if (series === 'Cup') return cupDrivers.find(d => d.num === num);
+    return (bonusPools[series] || []).find(d => d.num === num);
+  };
+
   return <div style={{ padding:'14px 20px 24px' }}>
     <SectionLabel>All Rosters</SectionLabel>
     <div style={{ marginTop:14 }}>
-      {players.map((p, i) => (
-        <div key={p.id} style={{
+      {players.map((p, i) => {
+        const myPicks = draftState.picks.filter(pk => pk.playerId === p.id);
+        return <div key={p.id} style={{
           padding:'14px 0',
           borderBottom: i === players.length-1 ? 'none' : `0.5px solid ${T.line2}`,
         }}>
@@ -225,27 +398,46 @@ function DraftComplete({ state, onNav, weekDrivers }) {
             <PlayerBadge player={p} size={22}/>
             <span style={{ fontFamily: FD, fontSize:18, fontWeight:600, letterSpacing:'-0.03em' }}>{p.name}</span>
           </div>
-          <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-            {(byPlayer[p.id] || []).map(pk => {
-              const d = drivers.find(dv => dv.num === pk.driverNum);
-              return d && <CarNum key={pk.driverNum} driver={d} size={32}/>;
-            })}
-          </div>
-        </div>
-      ))}
+          {Object.keys(cfg.allotments).map(series => {
+            const seriesPicks = myPicks.filter(pk => (pk.series || 'Cup') === series);
+            if (seriesPicks.length === 0) return null;
+            const meta = SERIES[series] || { label: series };
+            return <div key={series} style={{ marginBottom:8 }}>
+              {series !== 'Cup' && <div style={{
+                fontFamily: FL, fontSize:8, fontWeight:600,
+                letterSpacing:'0.22em', textTransform:'uppercase',
+                color: T.hot, marginBottom:4,
+              }}>{meta.label}</div>}
+              <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                {seriesPicks.map(pk => {
+                  const d = lookupDriver(series, pk.driverNum);
+                  return d
+                    ? <CarNum key={`${series}:${pk.driverNum}`} driver={d} size={32}/>
+                    : <div key={`${series}:${pk.driverNum}`} style={{
+                        width:32, height:32, borderRadius:4,
+                        background: T.bg2, color: T.mute,
+                        display:'flex', alignItems:'center', justifyContent:'center',
+                        fontFamily: FB, fontSize:11, fontWeight:600,
+                      }}>#{pk.driverNum}</div>;
+                })}
+              </div>
+            </div>;
+          })}
+        </div>;
+      })}
     </div>
     <div style={{ display:'flex', gap:8, marginTop:18 }}>
       <button onClick={() => onNav('team')} style={{
         appearance:'none', flex:1, padding:14,
-        background: T.card, color: T.ink,
-        border: `0.5px solid ${T.line}`, borderRadius:3, cursor:'pointer',
-        fontFamily: FL, fontSize:11, fontWeight:500,
+        background: T.hot, color: T.ink,
+        border:'none', borderRadius:3, cursor:'pointer',
+        fontFamily: FL, fontSize:11, fontWeight:600,
         letterSpacing:'0.22em', textTransform:'uppercase',
       }}>My Team</button>
       <button onClick={() => onNav('enter-results')} style={{
         appearance:'none', flex:1, padding:14,
         background: T.ink, color: T.bg, border:'none', borderRadius:3, cursor:'pointer',
-        fontFamily: FL, fontSize:11, fontWeight:500,
+        fontFamily: FL, fontSize:11, fontWeight:600,
         letterSpacing:'0.22em', textTransform:'uppercase',
       }}>Enter Results →</button>
     </div>

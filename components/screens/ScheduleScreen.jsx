@@ -1,7 +1,8 @@
 'use client';
 import React from 'react';
 import { BackChip, RaceCountdown, TopBar } from '@/components/ui/primitives';
-import { FB, FD, FI, FL, T } from '@/lib/constants';
+import { FB, FD, FI, FL, SERIES, T } from '@/lib/constants';
+import { getWeekConfig } from '@/lib/utils';
 
 export default function ScheduleScreen({ state, onBack }) {
   const { schedule, currentWeek } = state;
@@ -11,6 +12,8 @@ export default function ScheduleScreen({ state, onBack }) {
       {schedule.map((race, idx) => {
         const isNow = race.wk === currentWeek;
         const isPast = race.wk < currentWeek;
+        const cfg = getWeekConfig(state, race.wk);
+        const hasBonus = cfg.bonusSeries.length > 0;
         return <div key={race.wk} style={{
           padding:'14px 0',
           borderBottom: idx === schedule.length-1 ? 'none' : `0.5px solid ${T.line2}`,
@@ -28,6 +31,13 @@ export default function ScheduleScreen({ state, onBack }) {
               <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:12, color: T.mute, marginTop:race.raceName ? 2 : 3 }}>
                 {race.type} · {race.len} mi · {race.laps} laps
               </div>
+              {hasBonus && <div style={{
+                marginTop:6, display:'inline-flex', alignItems:'center', gap:4,
+                padding:'2px 8px', background: T.hot, color:'#fff',
+                borderRadius:2,
+                fontFamily: FL, fontSize:9, fontWeight:700,
+                letterSpacing:'0.2em', textTransform:'uppercase',
+              }}>+ {cfg.bonusSeries.map(s => SERIES[s]?.short || s).join(' · ')}</div>}
               <div style={{ marginTop:6 }}>
                 <RaceCountdown date={race.date} time={race.time} network={race.network} tone="light" showNetwork/>
               </div>
