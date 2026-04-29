@@ -3,6 +3,7 @@ import React from 'react';
 import { BackChip, CarNum, PlayerBadge, SectionLabel, TopBar } from '@/components/ui/primitives';
 import { FB, FD, FI, FL, T } from '@/lib/constants';
 import { DEFAULT_DRIVERS } from '@/lib/data';
+import { downloadShareCard } from '@/lib/shareCard';
 
 export default function RecapScreen({ state, onNav }) {
   const { players, weeklyResults, draftHistory = [] } = state;
@@ -22,8 +23,33 @@ export default function RecapScreen({ state, onNav }) {
   const hist = draftHistory.find(h => h.wk === last.wk);
   const raceMeta = (state.schedule || []).find(s => s.wk === last.wk);
 
+  // Trigger PNG download. Builds the share-card payload by attaching each
+  // player's roster chips to their result row (so the leader's drivers render
+  // in the bottom strip of the image).
+  const onShare = () => {
+    const payload = {
+      meta: { wk: last.wk, raceName: raceMeta?.raceName, track: last.track },
+      players: sortedRes.map(p => {
+        const roster = hist
+          ? hist.picks.filter(pk => pk.playerId === p.id).map(pk => drivers.find(d => d.num === pk.driverNum)).filter(Boolean)
+          : [];
+        return {
+          name: p.name,
+          color: p.color,
+          pts: p.pts,
+          drivers: roster.map(d => ({ num: d.num, name: d.name, primary: d.primary, secondary: d.secondary })),
+        };
+      }),
+    };
+    downloadShareCard(payload);
+  };
+
   return <div style={{ paddingBottom:20 }}>
-    <TopBar subtitle={`Wk ${String(last.wk).padStart(2,'0')} · Final`} title="Race Recap" right={<BackChip onClick={() => onNav('more')}/>}/>
+    <TopBar
+      subtitle={`Wk ${String(last.wk).padStart(2,'0')} · Final`}
+      title="Race Recap"
+      right={<BackChip onClick={() => onNav('more')}/>}
+    />
 
     <div style={{ padding:'0 20px 20px' }}>
       <div style={{ background: T.ink, color: T.bg, borderRadius:4, padding:'22px 20px' }}>
@@ -37,6 +63,18 @@ export default function RecapScreen({ state, onNav }) {
         <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:14, color:'rgba(247,244,237,0.7)', marginTop:10 }}>
           <span style={{ color: T.bg }}>{sortedRes[0].name}</span> took the week · {sortedRes[0].pts} pts
         </div>
+      </div>
+
+      <button onClick={onShare} style={{
+        appearance:'none', width:'100%', marginTop:12,
+        background:'transparent', color: T.ink,
+        border:`0.5px solid ${T.ink}`, borderRadius:3,
+        padding:'12px 14px', cursor:'pointer',
+        fontFamily: FL, fontSize:11, fontWeight:600,
+        letterSpacing:'0.24em', textTransform:'uppercase',
+      }}>↓ Download Share Card</button>
+      <div style={{ marginTop:6, fontFamily: FI, fontStyle:'italic', fontSize:11, color: T.mute, lineHeight:1.5 }}>
+        Saves a 1080×1920 image perfect for the league group text.
       </div>
     </div>
 

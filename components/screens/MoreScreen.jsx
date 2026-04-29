@@ -46,7 +46,6 @@ export default function MoreScreen({ state, me, setScreen, onReset, onSignOut })
 
     <SectionLabel>Settings</SectionLabel>
     <div style={{ padding:'14px 20px 20px' }}>
-      <MenuRow label="League Members" sub="Edit names & colors" onClick={() => setScreen('members')}/>
       <MenuRow label="Manage Drivers" sub="Edit entry list" onClick={() => setScreen('drivers')}/>
       <MenuRow label="Rules" sub={`${ROUNDS_PER_WEEK} drivers/week · Snake`} onClick={() => setScreen('rules')}/>
       <MenuRow label="Sign Out" sub="Return to league login" onClick={onSignOut} last/>

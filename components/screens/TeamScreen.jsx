@@ -1,7 +1,7 @@
 'use client';
 import React, { useMemo, useState } from 'react';
 import { BackChip, CarNum, DriverRow, SectionLabel, TopBar } from '@/components/ui/primitives';
-import { FB, FD, FI, FL, T } from '@/lib/constants';
+import { FB, FD, FI, FL, ROUNDS_PER_WEEK, T } from '@/lib/constants';
 import { DEFAULT_DRIVERS } from '@/lib/data';
 import { makeDriverWeekData } from '@/lib/utils';
 
@@ -31,7 +31,11 @@ export default function TeamScreen({ state, me, onNav }) {
     <div style={{ padding:'14px 20px 20px' }}>
       {myDrivers.length === 0 ? (
         <div style={{ padding:'28px 20px', textAlign:'center', borderTop:`0.5px solid ${T.line}`, borderBottom:`0.5px solid ${T.line}` }}>
-          <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:15, color: T.mute }}>{(draftState?.phase === 'done') ? 'No picks this week' : 'Draft in progress'}</div>
+          <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:15, color: T.mute, lineHeight:1.5 }}>
+            {(draftState?.phase === 'done')
+              ? `No picks this week — looks like you sat out Wk ${String(currentWeek).padStart(2,'0')}.`
+              : `The Wk ${String(currentWeek).padStart(2,'0')} draft is still going. Lock in your ${ROUNDS_PER_WEEK} drivers.`}
+          </div>
           <button onClick={() => onNav('draft')} style={{
             appearance:'none', marginTop:14,
             background: T.ink, color: T.bg,

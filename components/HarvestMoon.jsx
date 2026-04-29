@@ -27,8 +27,6 @@ import ProfileScreen       from '@/components/screens/ProfileScreen';
 import ScheduleScreen      from '@/components/screens/ScheduleScreen';
 import HistoryScreen       from '@/components/screens/HistoryScreen';
 import RulesScreen         from '@/components/screens/RulesScreen';
-import MembersScreen       from '@/components/screens/MembersScreen';
-import SwitchScreen        from '@/components/screens/SwitchScreen';
 import ManageDriversScreen from '@/components/screens/ManageDriversScreen';
 
 // ─── HELPERS ─────────────────────────────────────────────────────
@@ -40,7 +38,7 @@ const SCREEN_TO_TAB = {
   standings:'standings',
   team:'team',
   more:'more', schedule:'more', history:'more', rules:'more',
-  members:'more', switch:'more', recap:'more', drivers:'more',
+  recap:'more', drivers:'more',
   profile:'more', sync:'more', 'edit-results':'more',
 };
 
@@ -223,8 +221,6 @@ export default function App() {
     schedule:        <ScheduleScreen      state={state} onBack={() => setScreen('more')}/>,
     history:         <HistoryScreen       state={state} me={me} onBack={() => setScreen('more')} onEdit={(wk) => { setEditingWeek(wk); setScreen('edit-results'); }}/>,
     rules:           <RulesScreen         state={state} onBack={() => setScreen('more')}/>,
-    members:         <MembersScreen       state={state} setState={setState} onBack={() => setScreen('more')}/>,
-    switch:          <SwitchScreen        state={state} me={me} setMe={(p) => setMeIdState(p.id)} onBack={() => setScreen(screen === 'switch' ? 'home' : 'more')}/>,
     drivers:         <ManageDriversScreen state={state} setState={setState} onBack={() => onNav(driversReturnRef.current === 'draft' ? 'draft' : 'more')}/>,
   };
 

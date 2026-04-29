@@ -95,6 +95,15 @@ export function Icon({ name, size = 22, filled }) {
     case 'trophy': return <svg width={size} height={size} viewBox="0 0 24 24" fill="none"><path d="M7 4H17V10A5 5 0 0 1 7 10V4Z" fill={filled?c:'none'} stroke={c} strokeWidth="1.6"/><path d="M17 5H20V7A3 3 0 0 1 17 10" stroke={c} strokeWidth="1.6"/><path d="M7 5H4V7A3 3 0 0 0 7 10" stroke={c} strokeWidth="1.6"/><path d="M10 15H14V20H10V15Z" stroke={c} strokeWidth="1.6" fill={filled?c:'none'}/><path d="M8 20H16" stroke={c} strokeWidth="1.8" strokeLinecap="round"/></svg>;
     case 'helm':   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none"><path d="M4 12C4 7 7 4 12 4C17 4 20 7 20 12V15H4V12Z" fill={filled?c:'none'} stroke={c} strokeWidth="1.6"/><rect x="4" y="15" width="16" height="4" rx="1" fill={filled?c:'none'} stroke={c} strokeWidth="1.6"/><path d="M9 12V10M15 12V10" stroke={c} strokeWidth="1.6" strokeLinecap="round"/></svg>;
     case 'more':   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none"><circle cx="6" cy="12" r="1.6" fill={c}/><circle cx="12" cy="12" r="1.6" fill={c}/><circle cx="18" cy="12" r="1.6" fill={c}/></svg>;
+    case 'checkered': return <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d="M5 3V21" stroke={c} strokeWidth="1.6" strokeLinecap="round"/>
+      <rect x="7"  y="4" width="3.5" height="3.5" fill={c}/>
+      <rect x="14" y="4" width="3.5" height="3.5" fill={c}/>
+      <rect x="10.5" y="7.5" width="3.5" height="3.5" fill={c}/>
+      <rect x="17.5" y="7.5" width="3"   height="3.5" fill={c}/>
+      <rect x="7"  y="11" width="3.5" height="3.5" fill={c}/>
+      <rect x="14" y="11" width="3.5" height="3.5" fill={c}/>
+    </svg>;
     default:       return null;
   }
 }
@@ -449,6 +458,28 @@ function Spinner({ spinning, armed }) {
       strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
     />}
   </svg>;
+}
+
+// Compact "weekly wins" indicator: a checkered flag glyph followed by ×N.
+// 0 wins renders the flag in muted gray. 1+ wins highlight in copper.
+// Designed for inline use anywhere a season-ranking row needs to show how
+// many race wins a player has accumulated, without 8 flag icons wrapping
+// the layout. Pairs with `size` for parent contexts (e.g. compact={true}
+// gives a smaller variant for the Home top-3).
+export function WinsCount({ wins, compact = false, style = {} }) {
+  const fontSize = compact ? 10 : 11;
+  const iconSize = compact ? 11 : 13;
+  const has = wins > 0;
+  const color = has ? T.hot : 'rgba(20,17,13,0.25)';
+  return <span style={{
+    display:'inline-flex', alignItems:'center', gap:3,
+    color, fontFamily: FB, fontSize, fontWeight:600,
+    fontVariantNumeric:'tabular-nums', letterSpacing:'-0.01em',
+    ...style,
+  }} title={`${wins} weekly ${wins === 1 ? 'win' : 'wins'}`}>
+    <Icon name="checkered" size={iconSize}/>
+    <span style={{ marginLeft:1 }}>×{wins}</span>
+  </span>;
 }
 
 export function OnTheClockBanner({ pickerName, onTap }) {

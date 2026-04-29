@@ -1,6 +1,6 @@
 'use client';
 import React from 'react';
-import { PlayerBadge, RaceCountdown, SectionLabel, TopBar } from '@/components/ui/primitives';
+import { PlayerBadge, RaceCountdown, SectionLabel, TopBar, WinsCount } from '@/components/ui/primitives';
 import { InstallHint } from '@/components/ui/InstallHint';
 import { ADMIN_ID, FB, FD, FI, FL, ROUNDS_PER_WEEK, T } from '@/lib/constants';
 import { computeStandings, ordinalSuffix, raceCountdown } from '@/lib/utils';
@@ -191,7 +191,11 @@ export default function HomeScreen({ state, me, onNav }) {
     {/* Leaderboard top 3 */}
     <SectionLabel right={<span onClick={() => onNav('standings')} style={{ cursor:'pointer', fontFamily: FI, fontStyle:'italic', fontSize:12, letterSpacing:'0.01em', textTransform:'none', color: T.ink }}>All →</span>}>Leaderboard</SectionLabel>
     <div style={{ padding:'14px 20px 20px' }}>
-      {top3.map((p, i) => (
+      {weeklyResults.length === 0 ? (
+        <div style={{ padding:'18px 0', fontFamily: FI, fontStyle:'italic', fontSize:13, color: T.mute, lineHeight:1.5 }}>
+          Standings open at 0 — finish the first race and the leaderboard fills in.
+        </div>
+      ) : top3.map((p, i) => (
         <div key={p.id} style={{
           padding:'14px 0',
           borderBottom: i === top3.length-1 ? 'none' : `0.5px solid ${T.line2}`,
@@ -199,7 +203,10 @@ export default function HomeScreen({ state, me, onNav }) {
         }}>
           <div style={{ fontFamily: FD, fontSize:20, fontWeight:600, width:22, color: T.ink, lineHeight:1, fontVariantNumeric:'tabular-nums' }}>0{i+1}</div>
           <PlayerBadge player={p} size={26}/>
-          <div style={{ flex:1, fontFamily: FD, fontSize:20, fontWeight:600, letterSpacing:'-0.03em', lineHeight:1 }}>{p.name}</div>
+          <div style={{ flex:1, display:'flex', alignItems:'center', gap:8, minWidth:0, flexWrap:'wrap' }}>
+            <span style={{ fontFamily: FD, fontSize:20, fontWeight:600, letterSpacing:'-0.03em', lineHeight:1 }}>{p.name}</span>
+            <WinsCount wins={p.wins} compact/>
+          </div>
           <div style={{ fontFamily: FB, fontSize:14, fontWeight:500, color: T.ink, fontVariantNumeric:'tabular-nums', letterSpacing:'-0.01em' }}>{p.seasonPts.toLocaleString()}</div>
         </div>
       ))}

@@ -1,6 +1,6 @@
 'use client';
 import React from 'react';
-import { BackChip, PlayerBadge, SectionLabel, TopBar } from '@/components/ui/primitives';
+import { BackChip, PlayerBadge, SectionLabel, TopBar, WinsCount } from '@/components/ui/primitives';
 import { FB, FD, FI, FL, T } from '@/lib/constants';
 import { computeStandings } from '@/lib/utils';
 
@@ -16,11 +16,21 @@ export default function StandingsScreen({ state, onNav }) {
 
     <div style={{ padding:'0 20px 20px' }}>
       <div style={{ background: T.ink, color: T.bg, borderRadius:4, padding:'22px 20px' }}>
-        <div style={{ fontFamily: FL, fontSize:9, fontWeight:500, letterSpacing:'0.24em', textTransform:'uppercase', color:'rgba(247,244,237,0.4)' }}>Current Leader</div>
-        <div style={{ fontFamily: FD, fontSize:48, fontWeight:600, letterSpacing:'-0.03em', lineHeight:1, marginTop:6 }}>{sorted[0].name}</div>
-        <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:14, color:'rgba(247,244,237,0.6)', marginTop:8 }}>
-          {sorted[0].seasonPts.toLocaleString()} pts{sorted[1] ? ` · +${sorted[0].seasonPts - sorted[1].seasonPts} over ${sorted[1].name}` : ''}
-        </div>
+        {completedWeeks.length === 0 ? <>
+          <div style={{ fontFamily: FL, fontSize:9, fontWeight:500, letterSpacing:'0.24em', textTransform:'uppercase', color:'rgba(247,244,237,0.4)' }}>Season opener</div>
+          <div style={{ fontFamily: FD, fontSize:36, fontWeight:600, letterSpacing:'-0.03em', lineHeight:1.05, marginTop:6 }}>
+            All tied at 0 — let the season begin.
+          </div>
+          <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:14, color:'rgba(247,244,237,0.6)', marginTop:10, lineHeight:1.5 }}>
+            Standings will populate once the first race is in the books. Slot picks for Week 1 are alphabetical.
+          </div>
+        </> : <>
+          <div style={{ fontFamily: FL, fontSize:9, fontWeight:500, letterSpacing:'0.24em', textTransform:'uppercase', color:'rgba(247,244,237,0.4)' }}>Current Leader</div>
+          <div style={{ fontFamily: FD, fontSize:48, fontWeight:600, letterSpacing:'-0.03em', lineHeight:1, marginTop:6 }}>{sorted[0].name}</div>
+          <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:14, color:'rgba(247,244,237,0.6)', marginTop:8 }}>
+            {sorted[0].seasonPts.toLocaleString()} pts{sorted[1] ? ` · +${sorted[0].seasonPts - sorted[1].seasonPts} over ${sorted[1].name}` : ''}
+          </div>
+        </>}
       </div>
     </div>
 
@@ -36,7 +46,10 @@ export default function StandingsScreen({ state, onNav }) {
           <div style={{ fontFamily: FD, fontSize:20, fontWeight:600, width:26, color: T.ink, lineHeight:1, fontVariantNumeric:'tabular-nums' }}>{String(i+1).padStart(2,'0')}</div>
           <PlayerBadge player={p} size={26}/>
           <div style={{ flex:1, minWidth:0 }}>
-            <div style={{ fontFamily: FD, fontSize:20, fontWeight:600, letterSpacing:'-0.03em', lineHeight:1 }}>{p.name}</div>
+            <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+              <span style={{ fontFamily: FD, fontSize:20, fontWeight:600, letterSpacing:'-0.03em', lineHeight:1 }}>{p.name}</span>
+              <WinsCount wins={p.wins}/>
+            </div>
             <div style={{ marginTop:6, height:2, background: T.bg2, borderRadius:0 }}>
               <div style={{ width: `${(p.seasonPts / max) * 100}%`, height:'100%', background: i === 0 ? T.hot : T.ink2 }}/>
             </div>
@@ -45,7 +58,7 @@ export default function StandingsScreen({ state, onNav }) {
             <div style={{ fontFamily: FB, fontSize:15, fontWeight:500, fontVariantNumeric:'tabular-nums', letterSpacing:'-0.01em' }}>{p.seasonPts.toLocaleString()}</div>
             <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:11, color: T.mute, marginTop:1, fontVariantNumeric:'tabular-nums' }}>
               {i === 0
-                ? `${p.wins} ${p.wins === 1 ? 'win' : 'wins'}${p.avgPts ? ` · avg ${p.avgPts}` : ''}`
+                ? (p.avgPts ? `avg ${p.avgPts}` : 'Leader')
                 : `−${gap.toLocaleString()} back${p.avgPts ? ` · avg ${p.avgPts}` : ''}`}
             </div>
           </div>
