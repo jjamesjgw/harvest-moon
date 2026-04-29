@@ -2,7 +2,6 @@
 import React from 'react';
 import { PlayerBadge, RaceCountdown, SectionLabel, TopBar, WinsCount } from '@/components/ui/primitives';
 import { InstallHint } from '@/components/ui/InstallHint';
-import { TrackShape } from '@/components/ui/TrackShape';
 import { ADMIN_ID, FB, FD, FI, FL, T } from '@/lib/constants';
 import { computeStandings, getWeekConfig, ordinalSuffix, raceCountdown } from '@/lib/utils';
 
@@ -121,21 +120,14 @@ export default function HomeScreen({ state, me, onNav }) {
               Week {String(currentWeek).padStart(2,'0')}
             </div>
           </div>
-          <div style={{ display:'flex', alignItems:'flex-start', gap:14 }}>
-            <div style={{ flex:1, minWidth:0 }}>
-              <div style={{ fontFamily: FD, fontSize:44, fontWeight:600, lineHeight:0.95, letterSpacing:'-0.03em' }}>
-                {currentRace.raceName || currentRace.track}
-              </div>
-              <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:13, color:'rgba(247,244,237,0.7)', marginTop:6, letterSpacing:'0.01em' }}>
-                {currentRace.track}
-              </div>
-              <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:12, color:'rgba(247,244,237,0.45)', marginTop:4, letterSpacing:'0.01em' }}>
-                {currentRace.type} · {currentRace.len} mi · {currentRace.laps} laps
-              </div>
-            </div>
-            <div style={{ flexShrink:0, paddingTop:6 }}>
-              <TrackShape track={currentRace.track} size={64} color="rgba(247,244,237,0.55)" stroke={2.0}/>
-            </div>
+          <div style={{ fontFamily: FD, fontSize:44, fontWeight:600, lineHeight:0.95, letterSpacing:'-0.03em' }}>
+            {currentRace.raceName || currentRace.track}
+          </div>
+          <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:13, color:'rgba(247,244,237,0.7)', marginTop:6, letterSpacing:'0.01em' }}>
+            {currentRace.track}
+          </div>
+          <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:12, color:'rgba(247,244,237,0.45)', marginTop:4, letterSpacing:'0.01em' }}>
+            {currentRace.type} · {currentRace.len} mi · {currentRace.laps} laps
           </div>
           {(currentRace.time || currentRace.network) && <div style={{ marginTop:12 }}>
             <RaceCountdown

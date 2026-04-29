@@ -1,7 +1,6 @@
 'use client';
 import React, { useState } from 'react';
 import { BackChip, CarNum, PlayerBadge, TopBar } from '@/components/ui/primitives';
-import { TrackShape } from '@/components/ui/TrackShape';
 import { ADMIN_ID, FB, FD, FI, FL, SERIES, T } from '@/lib/constants';
 import { DEFAULT_DRIVERS } from '@/lib/data';
 
@@ -77,9 +76,6 @@ export default function HistoryScreen({ state, me, onBack, onEdit }) {
                 <PlayerBadge player={winner} size={14}/>
                 <span style={{ fontFamily: FI, fontStyle:'italic', fontSize:12, color: T.mute }}>{winner.name} · {topPid[1]} pts</span>
               </div>}
-            </div>
-            <div style={{ flexShrink:0, opacity:0.7 }}>
-              <TrackShape track={w.track} size={32} color={T.ink2} stroke={2.0}/>
             </div>
             <div style={{ color: T.mute, fontFamily: FD, fontSize:18, fontStyle:'italic' }}>{isExp ? '—' : '+'}</div>
           </button>

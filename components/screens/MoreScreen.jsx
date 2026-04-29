@@ -41,6 +41,7 @@ export default function MoreScreen({ state, me, setScreen, onReset, onSignOut })
     <div style={{ padding:'14px 20px 20px' }}>
       <MenuRow label="Schedule" sub={`${schedule.length} races · Wk ${currentWeek} of ${schedule.length}`} onClick={() => setScreen('schedule')}/>
       <MenuRow label="Draft History" sub={isAdmin ? `${weeklyResults.length} past week${weeklyResults.length === 1 ? '' : 's'} · tap to view or edit` : `${weeklyResults.length} past week${weeklyResults.length === 1 ? '' : 's'}`} onClick={() => setScreen('history')}/>
+      <MenuRow label="Drivers" sub="League-wide stats & per-driver breakdowns" onClick={() => setScreen('drivers')}/>
       <MenuRow label="Last Race Recap" sub={lastResult ? lastResult.track : 'No results yet'} onClick={() => setScreen('recap')} last/>
     </div>
 
@@ -53,7 +54,7 @@ export default function MoreScreen({ state, me, setScreen, onReset, onSignOut })
     {isAdmin && <>
       <SectionLabel>Admin Tools</SectionLabel>
       <div style={{ padding:'14px 20px 20px' }}>
-        <MenuRow label="Manage Drivers" sub="Cup one-offs + bonus pools" onClick={() => setScreen('drivers')}/>
+        <MenuRow label="Manage Drivers" sub="Cup one-offs + bonus pools" onClick={() => setScreen('manage-drivers')}/>
         <MenuRow label="Download Backup" sub="Save the full league state as JSON to your device" onClick={() => downloadLeagueBackup(state)} last/>
       </div>
       <SectionLabel>Danger Zone</SectionLabel>

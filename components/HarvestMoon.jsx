@@ -28,6 +28,7 @@ import ScheduleScreen      from '@/components/screens/ScheduleScreen';
 import HistoryScreen       from '@/components/screens/HistoryScreen';
 import RulesScreen         from '@/components/screens/RulesScreen';
 import ManageDriversScreen from '@/components/screens/ManageDriversScreen';
+import DriversScreen from '@/components/screens/DriversScreen';
 
 // ─── HELPERS ─────────────────────────────────────────────────────
 
@@ -38,7 +39,7 @@ const SCREEN_TO_TAB = {
   standings:'standings',
   team:'team',
   more:'more', schedule:'more', history:'more', rules:'more',
-  recap:'more', drivers:'more',
+  recap:'more', drivers:'more', 'manage-drivers':'more',
   profile:'more', sync:'more', 'edit-results':'more',
 };
 
@@ -148,14 +149,15 @@ export default function App() {
   }, [myTurnInfo]);
 
   // Navigation. Special-cases: 'draft' decides slot vs snake screen by phase;
-  // 'drivers' tracks the originating screen so Back routes correctly.
+  // 'manage-drivers' tracks the originating screen so Back routes correctly
+  // (it can be opened from Draft to add a one-off driver mid-pick).
   const onNav = (id) => {
     if (id === 'draft') {
       const phase = state?.draftState?.phase;
       setScreen(phase === 'slot-pick' || phase === 'ready' ? 'slot' : 'draft');
-    } else if (id === 'drivers') {
+    } else if (id === 'manage-drivers') {
       driversReturnRef.current = (screen === 'draft' || screen === 'slot') ? 'draft' : 'more';
-      setScreen('drivers');
+      setScreen('manage-drivers');
     } else {
       setScreen(id);
     }
@@ -223,7 +225,8 @@ export default function App() {
     schedule:        <ScheduleScreen      state={state} onBack={() => setScreen('more')}/>,
     history:         <HistoryScreen       state={state} me={me} onBack={() => setScreen('more')} onEdit={(wk) => { setEditingWeek(wk); setScreen('edit-results'); }}/>,
     rules:           <RulesScreen         state={state} onBack={() => setScreen('more')}/>,
-    drivers:         <ManageDriversScreen state={state} setState={setState} me={me} onBack={() => onNav(driversReturnRef.current === 'draft' ? 'draft' : 'more')}/>,
+    drivers:         <DriversScreen       state={state} me={me} onBack={() => setScreen('more')}/>,
+    'manage-drivers':<ManageDriversScreen state={state} setState={setState} me={me} onBack={() => onNav(driversReturnRef.current === 'draft' ? 'draft' : 'more')}/>,
   };
 
   return <AppFrame>
