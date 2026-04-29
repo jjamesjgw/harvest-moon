@@ -54,22 +54,45 @@ export default function StandingsScreen({ state, onNav }) {
     </div>
 
     {completedWeeks.length > 0 && <>
-      <SectionLabel>By Week</SectionLabel>
-      <div style={{ padding:'14px 20px 20px', overflowX:'auto' }}>
-        <div style={{ borderTop:`0.5px solid ${T.line}`, borderBottom:`0.5px solid ${T.line}` }}>
-          <div style={{ display:'grid', gridTemplateColumns:`78px repeat(${completedWeeks.length}, 44px)`, padding:'8px 0', borderBottom:`0.5px solid ${T.line2}` }}>
-            <div style={{ padding:'0 6px', fontFamily: FL, fontSize:9, fontWeight:500, letterSpacing:'0.22em', textTransform:'uppercase', color: T.mute }}>Player</div>
+      <SectionLabel right={<span style={{ fontFamily: FI, fontStyle:'italic', fontSize:11, textTransform:'none', letterSpacing:'0.01em', color: T.mute }}>Scroll →</span>}>By Week</SectionLabel>
+      <div style={{ padding:'14px 20px 20px' }}>
+        <div style={{
+          borderTop:`0.5px solid ${T.line}`, borderBottom:`0.5px solid ${T.line}`,
+          overflowX:'auto', overflowY:'hidden',
+        }}>
+          <div style={{
+            display:'grid',
+            gridTemplateColumns:`72px repeat(${completedWeeks.length}, 38px) 56px`,
+            padding:'8px 0', borderBottom:`0.5px solid ${T.line2}`,
+            background: T.bg, position:'sticky', top:0,
+          }}>
+            <div style={{
+              padding:'0 6px', fontFamily: FL, fontSize:9, fontWeight:600,
+              letterSpacing:'0.22em', textTransform:'uppercase', color: T.mute,
+              position:'sticky', left:0, background: T.bg,
+            }}>Player</div>
             {completedWeeks.map(w => (
-              <div key={w.wk} style={{ textAlign:'center', fontFamily: FL, fontSize:9, fontWeight:500, letterSpacing:'0.18em', textTransform:'uppercase', color: T.mute }}>W{String(w.wk).padStart(2,'0')}</div>
+              <div key={w.wk} style={{
+                textAlign:'center', fontFamily: FB, fontSize:11, fontWeight:600,
+                color: T.mute, fontVariantNumeric:'tabular-nums',
+              }}>{String(w.wk).padStart(2,'0')}</div>
             ))}
+            <div style={{
+              textAlign:'right', paddingRight:6, fontFamily: FL, fontSize:9, fontWeight:600,
+              letterSpacing:'0.22em', textTransform:'uppercase', color: T.hot,
+            }}>Total</div>
           </div>
-          {players.map((p, pi) => (
+          {sorted.map((p, pi) => (
             <div key={p.id} style={{
-              display:'grid', gridTemplateColumns:`78px repeat(${completedWeeks.length}, 44px)`,
+              display:'grid',
+              gridTemplateColumns:`72px repeat(${completedWeeks.length}, 38px) 56px`,
               alignItems:'center',
-              borderBottom: pi === players.length-1 ? 'none' : `0.5px solid ${T.line2}`,
+              borderBottom: pi === sorted.length-1 ? 'none' : `0.5px solid ${T.line2}`,
             }}>
-              <div style={{ padding:'10px 6px', display:'flex', alignItems:'center', gap:6 }}>
+              <div style={{
+                padding:'10px 6px', display:'flex', alignItems:'center', gap:6,
+                position:'sticky', left:0, background: T.bg,
+              }}>
                 <PlayerBadge player={p} size={18}/>
                 <span style={{ fontFamily: FD, fontSize:14, fontWeight:600, letterSpacing:'-0.03em' }}>{p.name.slice(0,4)}</span>
               </div>
@@ -85,6 +108,11 @@ export default function StandingsScreen({ state, onNav }) {
                   fontVariantNumeric:'tabular-nums',
                 }}>{mypts}</div>;
               })}
+              <div style={{
+                textAlign:'right', paddingRight:6,
+                fontFamily: FB, fontSize:13, fontWeight:600,
+                color: T.ink, fontVariantNumeric:'tabular-nums',
+              }}>{p.seasonPts.toLocaleString()}</div>
             </div>
           ))}
         </div>

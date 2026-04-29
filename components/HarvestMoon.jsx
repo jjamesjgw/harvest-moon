@@ -11,7 +11,7 @@ import {
   buildSlotPickOrder, buildSnakeOrder, computeStandings, makeFreshState,
 } from '@/lib/utils';
 import {
-  AppFrame, TabBar, OnTheClockBanner, SaveBanner, YourTurnToast,
+  AppFrame, TabBar, OnTheClockBanner, PullToRefresh, SaveBanner, YourTurnToast,
 } from '@/components/ui/primitives';
 
 import HomeScreen          from '@/components/screens/HomeScreen';
@@ -101,7 +101,7 @@ function detectActiveTurn(state) {
 export default function App() {
   useGlobalStyles();
 
-  const { state: rawState, setState: setStateRemote, loading, saveStatus, lastError, retry } = useLeague();
+  const { state: rawState, setState: setStateRemote, loading, saveStatus, lastError, retry, refresh, refreshing } = useLeague();
 
   const [screen, setScreen] = useState('home');
   const [meId, setMeIdState] = useState(null);
@@ -232,9 +232,15 @@ export default function App() {
     {banner}
     {turnToast}
     {draftBanner}
-    <div ref={contentRef} className="hm-scroll" style={{ flex:1, overflowY:'auto', background: T.bg }}>
+    <PullToRefresh
+      ref={contentRef}
+      onRefresh={refresh}
+      busy={refreshing}
+      disabled={onDraftScreen}
+      style={{ flex:1, overflowY:'auto', background: T.bg }}
+    >
       {screens[screen]}
-    </div>
+    </PullToRefresh>
     <TabBar active={activeTab} onNav={onNav}/>
   </AppFrame>;
 }

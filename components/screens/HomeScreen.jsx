@@ -3,11 +3,16 @@ import React from 'react';
 import { PlayerBadge, RaceCountdown, SectionLabel, TopBar } from '@/components/ui/primitives';
 import { InstallHint } from '@/components/ui/InstallHint';
 import { ADMIN_ID, FB, FD, FI, FL, ROUNDS_PER_WEEK, T } from '@/lib/constants';
-import { computeStandings, ordinalSuffix } from '@/lib/utils';
+import { computeStandings, ordinalSuffix, raceCountdown } from '@/lib/utils';
 
 export default function HomeScreen({ state, me, onNav }) {
   const { players, schedule, currentWeek, weeklyResults, draftState } = state;
-  const currentRace = schedule.find(s => s.wk === currentWeek) || schedule[0];
+  // After Wk 36 is finalized, currentWeek can advance to 37+ until reset. Show
+  // the last race in the schedule rather than blowing up.
+  const currentRace = schedule.find(s => s.wk === currentWeek)
+    || schedule[schedule.length - 1]
+    || { track: 'Off-season', type: '—', len: 0, laps: 0, date: '', time: '', network: '' };
+  const seasonOver = !schedule.find(s => s.wk === currentWeek);
   const standings = computeStandings(players, weeklyResults, currentWeek - 1);
   const sorted = [...standings].sort((a,b) => b.seasonPts - a.seasonPts);
   const rank = sorted.findIndex(s => s.id === me.id) + 1;
@@ -24,6 +29,11 @@ export default function HomeScreen({ state, me, onNav }) {
   const thisWeekResult = weeklyResults.find(w => w.wk === currentWeek);
   const resultsDue = draftComplete && !thisWeekResult?.finalized;
   const isAdmin = me.id === ADMIN_ID;
+
+  // Live race state — live if green flag is within ~4hr ago. Used to surface
+  // a pulsing "LIVE" pill on the hero so the league can feel race day in real time.
+  const cd = raceCountdown(currentRace.date, currentRace.time);
+  const raceLive = cd?.status === 'live';
 
   const statusLine = () => {
     if (phase === 'not-started') return 'Tap to start draft';
@@ -93,9 +103,17 @@ export default function HomeScreen({ state, me, onNav }) {
       <div style={{ background: T.ink, color: T.bg, borderRadius:4, overflow:'hidden', position:'relative' }}>
         <div style={{ padding:'20px 20px 18px' }}>
           <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:14 }}>
-            <div style={{ width:5, height:5, borderRadius:'50%', background: T.hot }}/>
-            <div style={{ fontFamily: FL, fontSize:9, fontWeight:500, letterSpacing:'0.24em', color: T.hot, textTransform:'uppercase' }}>
-              {resultsDue ? 'Race Day · Results Due' : draftComplete ? 'Race Day' : 'Drafting Now'}
+            <div style={{
+              width: raceLive ? 7 : 5, height: raceLive ? 7 : 5, borderRadius:'50%',
+              background: T.hot,
+              animation: raceLive ? 'pulse 1.6s ease-in-out infinite' : 'none',
+            }}/>
+            <div style={{ fontFamily: FL, fontSize:9, fontWeight: raceLive ? 700 : 500, letterSpacing:'0.24em', color: T.hot, textTransform:'uppercase' }}>
+              {raceLive
+                ? 'Live · Race Underway'
+                : resultsDue ? 'Race Day · Results Due'
+                : draftComplete ? 'Race Day'
+                : 'Drafting Now'}
             </div>
             <div style={{ fontFamily: FL, fontSize:9, fontWeight:400, letterSpacing:'0.18em', color:'rgba(247,244,237,0.4)', textTransform:'uppercase', marginLeft:'auto' }}>
               Round {String(currentWeek).padStart(2,'0')}

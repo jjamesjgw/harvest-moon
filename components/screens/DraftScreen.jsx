@@ -71,7 +71,7 @@ export default function DraftScreen({ state, setState, me, onNav }) {
   return <div style={{ paddingBottom:20, display:'flex', flexDirection:'column', minHeight:'100%' }}>
     <div style={{ position:'sticky', top:0, zIndex:5, background: T.bg, paddingBottom:10 }}>
       <TopBar
-        subtitle={`${currentRace.track} · Wk ${String(currentWeek).padStart(2,'0')}`}
+        subtitle={`${currentRace?.track || ''} · Wk ${String(currentWeek).padStart(2,'0')}`}
         title="Draft"
         right={<BackChip onClick={() => onNav('home')} label="Exit"/>}
       />

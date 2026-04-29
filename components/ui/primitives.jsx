@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { T, FD, FI, FL, FB } from '@/lib/constants';
 import { raceCountdown } from '@/lib/utils';
 
@@ -342,6 +342,115 @@ export function RaceCountdown({ date, time, network, tone = 'light', showNetwork
 // Slim status strip for "league members are mid-draft and someone else is on the clock".
 // Visible on every screen except the draft itself, so non-pickers know the league is waiting.
 // Renders nothing when it's the current user's turn (their own personal toast handles that).
+// Pull-to-refresh wrapper. Renders its children inside a scrollable container.
+// On touch devices, dragging down past THRESHOLD when scrolled to the top
+// arms the gesture; releasing past it triggers `onRefresh()`. A subtle
+// header indicator shows the state ("Pull down" → "Release to refresh" →
+// "Refreshing…"). The gesture is only active when scrollTop is 0 to avoid
+// hijacking normal vertical scrolls.
+//
+// onRefresh: async () => void   — caller's data refetch
+// disabled:  boolean            — skip the gesture entirely (e.g. during draft)
+// busy:      boolean            — caller-controlled "refreshing now" flag
+// scrollRef: optional ref       — exposes the inner scroll element to the parent
+const PULL_THRESHOLD = 70;
+const PULL_MAX = 110;
+export const PullToRefresh = React.forwardRef(function PullToRefresh(
+  { onRefresh, disabled = false, busy = false, children, style = {} },
+  scrollRef,
+) {
+  const innerRef = useRef(null);
+  const ref = scrollRef || innerRef;
+  const startYRef = useRef(null);
+  const [pull, setPull] = useState(0);   // current pull distance in px
+  const [armed, setArmed] = useState(false);
+
+  const onTouchStart = (e) => {
+    if (disabled || busy) return;
+    const el = ref.current;
+    if (!el || el.scrollTop > 0) { startYRef.current = null; return; }
+    startYRef.current = e.touches[0].clientY;
+  };
+  const onTouchMove = (e) => {
+    if (startYRef.current == null) return;
+    const dy = e.touches[0].clientY - startYRef.current;
+    if (dy <= 0) { setPull(0); setArmed(false); return; }
+    // Resistance curve — drag feels heavy past the threshold so it doesn't
+    // stretch all the way down to the bottom of the screen.
+    const eased = Math.min(PULL_MAX, dy * 0.55);
+    setPull(eased);
+    setArmed(eased >= PULL_THRESHOLD);
+  };
+  const onTouchEnd = async () => {
+    const wasArmed = armed;
+    startYRef.current = null;
+    setPull(0);
+    setArmed(false);
+    if (wasArmed && !busy && typeof onRefresh === 'function') {
+      try { navigator.vibrate?.(20); } catch {}
+      await onRefresh();
+    }
+  };
+
+  // The visible indicator's height matches the pull distance up to threshold,
+  // then "snaps" while you keep pulling further. While `busy` is true we hold
+  // it open at threshold height with the spinner.
+  const indicatorHeight = busy ? PULL_THRESHOLD : Math.min(pull, PULL_MAX);
+  const showIndicator = pull > 0 || busy;
+  const label = busy ? 'Refreshing…' : armed ? 'Release to refresh' : 'Pull down';
+
+  return <div
+    ref={ref}
+    onTouchStart={onTouchStart}
+    onTouchMove={onTouchMove}
+    onTouchEnd={onTouchEnd}
+    onTouchCancel={onTouchEnd}
+    style={{ position:'relative', ...style }}
+  >
+    <div style={{
+      position:'absolute', top:0, left:0, right:0,
+      height: indicatorHeight,
+      display:'flex', alignItems:'center', justifyContent:'center',
+      gap:8, color: T.mute, pointerEvents:'none',
+      transition: busy || pull === 0 ? 'height 200ms ease' : 'none',
+      overflow:'hidden',
+      opacity: showIndicator ? 1 : 0,
+    }}>
+      <Spinner spinning={busy} armed={armed}/>
+      <span style={{
+        fontFamily: FL, fontSize:9, fontWeight:600,
+        letterSpacing:'0.22em', textTransform:'uppercase',
+        color: armed || busy ? T.hot : T.mute,
+      }}>{label}</span>
+    </div>
+    <div style={{
+      transform: `translateY(${indicatorHeight}px)`,
+      transition: busy || pull === 0 ? 'transform 200ms ease' : 'none',
+    }}>
+      {children}
+    </div>
+  </div>;
+});
+
+function Spinner({ spinning, armed }) {
+  return <svg width="14" height="14" viewBox="0 0 24 24" style={{
+    animation: spinning ? 'hm-spin 0.8s linear infinite' : 'none',
+    transform: armed && !spinning ? 'rotate(180deg)' : 'rotate(0deg)',
+    transition: 'transform 150ms ease',
+  }}>
+    <circle cx="12" cy="12" r="9" fill="none"
+      stroke={spinning ? T.hot : (armed ? T.hot : T.mute)}
+      strokeWidth="2"
+      strokeDasharray={spinning ? '14 42' : '57 57'}
+      strokeLinecap="round"
+    />
+    {!spinning && <path d="M8 12L12 16L16 12" fill="none"
+      stroke={armed ? T.hot : T.mute}
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+    />}
+  </svg>;
+}
+
 export function OnTheClockBanner({ pickerName, onTap }) {
   if (!pickerName) return null;
   return <button onClick={onTap} style={{

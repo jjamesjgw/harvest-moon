@@ -41,13 +41,27 @@ export default function MembersScreen({ state, setState, onBack }) {
                   fontFamily: FL, fontSize:10, fontWeight:500, letterSpacing:'0.2em', textTransform:'uppercase',
                 }}>Done</button>
               </div>
-              <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-                {PALETTE.map(c => (
-                  <button key={c} onClick={() => updatePlayer(p.id, { color: c })} style={{
-                    appearance:'none', border: p.color === c ? `2px solid ${T.ink}` : '2px solid transparent',
-                    background: c, width:28, height:28, borderRadius:'50%', cursor:'pointer', padding:0,
-                  }}/>
-                ))}
+              <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                <div style={{ fontFamily: FL, fontSize:9, fontWeight:500, letterSpacing:'0.22em', textTransform:'uppercase', color: T.mute }}>Color</div>
+                {p.favDriverNum ? (
+                  <div style={{
+                    fontFamily: FI, fontStyle:'italic', fontSize:12, color: T.ink2, lineHeight:1.5,
+                    padding:'8px 12px', background:'rgba(184,147,90,0.08)',
+                    border:`0.5px solid rgba(184,147,90,0.25)`, borderRadius:3,
+                  }}>
+                    {p.name}'s color comes from their favorite driver (#{p.favDriverNum}).
+                    To change it, ask {p.name} to update their Profile.
+                  </div>
+                ) : (
+                  <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                    {PALETTE.map(c => (
+                      <button key={c} onClick={() => updatePlayer(p.id, { color: c })} style={{
+                        appearance:'none', border: p.color === c ? `2px solid ${T.ink}` : '2px solid transparent',
+                        background: c, width:28, height:28, borderRadius:'50%', cursor:'pointer', padding:0,
+                      }}/>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           ) : (

@@ -3,6 +3,23 @@ import React, { useState } from 'react';
 import { MenuRow, SectionLabel, TopBar } from '@/components/ui/primitives';
 import { ROUNDS_PER_WEEK } from '@/lib/constants';
 
+// Trigger a JSON download of the full league state. Used by the admin to
+// keep a local snapshot outside Supabase as insurance against accidental
+// resets or cloud outages.
+function downloadLeagueBackup(state) {
+  if (typeof window === 'undefined' || !state) return;
+  const stamp = new Date().toISOString().slice(0, 10);
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `harvest-moon-${stamp}-wk${String(state.currentWeek || 0).padStart(2, '0')}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 100);
+}
+
 export default function MoreScreen({ state, me, setScreen, onReset, onSignOut }) {
   const { schedule, currentWeek, weeklyResults, adminId } = state;
   const lastResult = weeklyResults.sort((a,b) => b.wk - a.wk)[0];
@@ -36,6 +53,10 @@ export default function MoreScreen({ state, me, setScreen, onReset, onSignOut })
     </div>
 
     {isAdmin && <>
+      <SectionLabel>Admin Tools</SectionLabel>
+      <div style={{ padding:'14px 20px 20px' }}>
+        <MenuRow label="Download Backup" sub="Save the full league state as JSON to your device" onClick={() => downloadLeagueBackup(state)} last/>
+      </div>
       <SectionLabel>Danger Zone</SectionLabel>
       <div style={{ padding:'14px 20px 40px' }}>
         <MenuRow label={resetArm ? 'Tap again to confirm' : 'Reset Season'} sub={resetArm ? 'This erases all picks & results' : 'Erase all results & drafts'} onClick={armReset} last/>
