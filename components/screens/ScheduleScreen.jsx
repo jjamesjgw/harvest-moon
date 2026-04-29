@@ -1,6 +1,7 @@
 'use client';
 import React from 'react';
 import { BackChip, RaceCountdown, TopBar } from '@/components/ui/primitives';
+import { TrackShape } from '@/components/ui/TrackShape';
 import { FB, FD, FI, FL, SERIES, T } from '@/lib/constants';
 import { getWeekConfig } from '@/lib/utils';
 
@@ -22,13 +23,18 @@ export default function ScheduleScreen({ state, onBack }) {
           <div style={{ display:'flex', alignItems:'flex-start', gap:14 }}>
             <div style={{ fontFamily: FD, fontSize:22, fontWeight:600, width:36, color: T.ink, lineHeight:1, fontVariantNumeric:'tabular-nums' }}>{String(race.wk).padStart(2,'0')}</div>
             <div style={{ flex:1, minWidth:0 }}>
-              <div style={{ fontFamily: FD, fontSize:18, fontWeight:600, letterSpacing:'-0.03em', lineHeight:1.1, color: isNow ? T.hot : T.ink }}>
-                {race.raceName || race.track}
+              <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontFamily: FD, fontSize:18, fontWeight:600, letterSpacing:'-0.03em', lineHeight:1.1, color: isNow ? T.hot : T.ink }}>
+                    {race.raceName || race.track}
+                  </div>
+                  {race.raceName && <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:12, color: T.ink2, marginTop:3 }}>
+                    {race.track}
+                  </div>}
+                </div>
+                <TrackShape track={race.track} size={42} color={isNow ? T.hot : T.ink2} stroke={2.2}/>
               </div>
-              {race.raceName && <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:12, color: T.ink2, marginTop:3 }}>
-                {race.track}
-              </div>}
-              <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:12, color: T.mute, marginTop:race.raceName ? 2 : 3 }}>
+              <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:12, color: T.mute, marginTop:race.raceName ? 4 : 3 }}>
                 {race.type} · {race.len} mi · {race.laps} laps
               </div>
               {hasBonus && <div style={{

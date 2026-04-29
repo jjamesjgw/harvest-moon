@@ -1,6 +1,7 @@
 'use client';
 import React from 'react';
 import { BackChip, CarNum, PlayerBadge, SectionLabel, TopBar } from '@/components/ui/primitives';
+import { TrackShape } from '@/components/ui/TrackShape';
 import { FB, FD, FI, FL, SERIES, T } from '@/lib/constants';
 import { DEFAULT_DRIVERS } from '@/lib/data';
 import { downloadShareCard } from '@/lib/shareCard';
@@ -90,13 +91,20 @@ export default function RecapScreen({ state, onNav }) {
 
     <div style={{ padding:'0 20px 20px' }}>
       <div style={{ background: T.ink, color: T.bg, borderRadius:4, padding:'22px 20px' }}>
-        <div style={{ fontFamily: FL, fontSize:9, fontWeight:500, letterSpacing:'0.24em', textTransform:'uppercase', color:'rgba(247,244,237,0.4)' }}>Race</div>
-        <div style={{ fontFamily: FD, fontSize:34, fontWeight:600, lineHeight:1, letterSpacing:'-0.03em', marginTop:4 }}>
-          {raceMeta?.raceName || last.track}
+        <div style={{ display:'flex', alignItems:'flex-start', gap:14 }}>
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ fontFamily: FL, fontSize:9, fontWeight:500, letterSpacing:'0.24em', textTransform:'uppercase', color:'rgba(247,244,237,0.4)' }}>Race</div>
+            <div style={{ fontFamily: FD, fontSize:34, fontWeight:600, lineHeight:1, letterSpacing:'-0.03em', marginTop:4 }}>
+              {raceMeta?.raceName || last.track}
+            </div>
+            {raceMeta?.raceName && <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:13, color:'rgba(247,244,237,0.6)', marginTop:6 }}>
+              {last.track}
+            </div>}
+          </div>
+          <div style={{ flexShrink:0, paddingTop:8 }}>
+            <TrackShape track={last.track} size={56} color="rgba(247,244,237,0.5)" stroke={2.0}/>
+          </div>
         </div>
-        {raceMeta?.raceName && <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:13, color:'rgba(247,244,237,0.6)', marginTop:6 }}>
-          {last.track}
-        </div>}
         <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:14, color:'rgba(247,244,237,0.7)', marginTop:10 }}>
           <span style={{ color: T.bg }}>{sortedRes[0].name}</span> took the week · {sortedRes[0].pts} pts
         </div>
