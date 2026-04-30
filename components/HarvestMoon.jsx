@@ -105,7 +105,7 @@ function detectActiveTurn(state) {
 export default function App() {
   useGlobalStyles();
 
-  const { state: rawState, setState: setStateRemote, loading, saveStatus, lastError, retry, refresh, refreshing } = useLeague();
+  const { state: rawState, setState: setStateRemote, loading, saveStatus, lastError, retry, refresh, refreshing, fetchSucceeded } = useLeague();
 
   const [screen, setScreen] = useState('home');
   // Persistent login: rehydrate the last-signed-in player ID from localStorage
@@ -146,9 +146,15 @@ export default function App() {
     : null;
 
   // Auto-init a fresh league row if Supabase has no document yet.
+  // CRITICAL: gated on fetchSucceeded so a transient Supabase fetch failure
+  // (which leaves rawState=null but loading=false via either the catch
+  // branch or the 3s boot timeout) cannot be mistaken for "no row exists"
+  // and trigger a wipe-write over real league data.
   useEffect(() => {
-    if (!loading && !rawState) setStateRemote(makeFreshState(CANONICAL_PLAYERS));
-  }, [loading, rawState, setStateRemote]);
+    if (!loading && !rawState && fetchSucceeded) {
+      setStateRemote(makeFreshState(CANONICAL_PLAYERS));
+    }
+  }, [loading, rawState, fetchSucceeded, setStateRemote]);
 
   // Scroll back to top whenever we change screens.
   useEffect(() => {
