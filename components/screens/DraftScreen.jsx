@@ -453,7 +453,7 @@ function DraftGrid({ drivers, pickedKeys, activeSeries, draftState, players, onP
                 <span style={{ color: T.mute, fontWeight:500 }}> · {stats.totalPicks}×</span>
               </div>
               {stats.weeks.length > 0 && <div style={{
-                fontFamily: FM, fontSize:9, color: T.mute,
+                fontFamily: FB, fontSize:9, color: T.mute,
                 fontVariantNumeric:'tabular-nums', letterSpacing:'0.02em',
               }}>
                 L{Math.min(3, stats.weeks.length)}{' '}
