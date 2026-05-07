@@ -19,6 +19,13 @@ export default function DraftScreen({ state, setState, me, onNav }) {
   const isAdmin = me.id === adminId;
   const [resetArm, setResetArm] = useState(false);
 
+  // View mode for the draft screen body. 'pick' = the existing driver pool
+  // grid (used to make a selection). 'board' = a full snake grid showing
+  // every pick so far, useful for spectators following along without
+  // losing place. The toggle only appears once at least one pick exists,
+  // and we revert to 'pick' if picks drain to zero (e.g. admin reset).
+  const [mode, setMode] = useState('pick');
+
   // Resolve this week's draft shape from config (allotments per series + total rounds).
   const cfg = getWeekConfig(state, currentWeek);
   const totalPicks = cfg.totalPicks * 1; // rounds = total per-player picks
@@ -29,6 +36,19 @@ export default function DraftScreen({ state, setState, me, onNav }) {
     const wkExtras = (weekDriversExtra || {})[currentWeek] || [];
     return [...DEFAULT_DRIVERS, ...wkExtras];
   }, [weekDriversExtra, currentWeek]);
+
+  // Series-aware driver lookup. Cup numbers can collide with bonus-pool
+  // numbers (e.g. #7 in Cup vs #7 in Truck), so dispatch by series before
+  // searching. Used by the latest-picks strip and the draft board to render
+  // historical picks correctly across series.
+  const lookupDriver = useMemo(() => {
+    const bonusPools = state.bonusDriversByWeek?.[currentWeek] || {};
+    return (series, num) => {
+      const s = series || 'Cup';
+      if (s === 'Cup') return cupDrivers.find(d => d.num === num);
+      return (bonusPools[s] || []).find(d => d.num === num);
+    };
+  }, [cupDrivers, state.bonusDriversByWeek, currentWeek]);
 
   // Decision-support stats for each driver — total picks, avg pts/draft,
   // and the last 3 race scores when drafted. Drives the small stat block
@@ -99,6 +119,13 @@ export default function DraftScreen({ state, setState, me, onNav }) {
   const currentPicker = onClock ? players.find(p => p.id === onClock.playerId) : null;
   const myTurn = currentPicker && currentPicker.id === me.id;
   const canPick = onClock && (onClock.playerId === me.id || isAdmin);
+
+  // Auto-revert to Pick mode if picks drain to zero (e.g. admin reset). The
+  // Board toggle is hidden in that state so without this we'd leave the
+  // user looking at an empty board with no way to flip back.
+  useEffect(() => {
+    if (pickIdx === 0 && mode === 'board') setMode('pick');
+  }, [pickIdx, mode]);
 
   // Track picks as series-scoped to allow same driver number across series.
   const pickedKeys = useMemo(
@@ -183,6 +210,13 @@ export default function DraftScreen({ state, setState, me, onNav }) {
     }));
   };
 
+  // Visibility flags for the new header pieces. Toggle only matters once a
+  // pick has been made; strip lives in Pick mode (Board shows everything
+  // natively); series tabs are picking-affordances and stay hidden in Board.
+  const showToggle = !done && pickIdx > 0;
+  const showStrip = !done && pickIdx > 0 && mode === 'pick';
+  const showSeriesTabs = !done && cfg.bonusSeries.length > 0 && currentPicker && mode === 'pick';
+
   return <div style={{ paddingBottom:20, display:'flex', flexDirection:'column', minHeight:'100%' }}>
     <div style={{ position:'sticky', top:0, zIndex:5, background: T.bg, paddingBottom:10 }}>
       <TopBar
@@ -202,7 +236,18 @@ export default function DraftScreen({ state, setState, me, onNav }) {
         />
       </div>
 
-      {!done && cfg.bonusSeries.length > 0 && currentPicker && <SeriesTabs
+      {showToggle && <div style={{ padding:'10px 20px 0' }}>
+        <ModeToggle mode={mode} onChange={setMode}/>
+      </div>}
+
+      {showStrip && <LatestPicksStrip
+        picks={draftState.picks}
+        players={players}
+        freshPickKeys={freshPickKeys}
+        lookupDriver={lookupDriver}
+      />}
+
+      {showSeriesTabs && <SeriesTabs
         cfg={cfg}
         picks={draftState.picks}
         pickerId={currentPicker.id}
@@ -236,7 +281,7 @@ export default function DraftScreen({ state, setState, me, onNav }) {
       </div>}
     </div>
 
-    {!done && <DraftGrid
+    {!done && mode === 'pick' && <DraftGrid
       drivers={activePool}
       pickedKeys={pickedKeys}
       activeSeries={activeSeries}
@@ -251,7 +296,19 @@ export default function DraftScreen({ state, setState, me, onNav }) {
       driverStats={driverStats}
       freshPickKeys={freshPickKeys}
     />}
-    {!done && activeSeries === 'Cup' && isAdmin && <div style={{ padding:'0 20px 24px' }}>
+
+    {!done && mode === 'board' && <DraftBoard
+      snakeOrder={snakeOrder}
+      picks={draftState.picks}
+      players={players}
+      slotAssign={draftState.slotAssign}
+      totalRounds={cfg.totalPicks}
+      currentPickIdx={pickIdx}
+      freshPickKeys={freshPickKeys}
+      lookupDriver={lookupDriver}
+    />}
+
+    {!done && mode === 'pick' && activeSeries === 'Cup' && isAdmin && <div style={{ padding:'0 20px 24px' }}>
       <button onClick={() => onNav('manage-drivers')} style={{
         appearance:'none', width:'100%',
         background: T.ink, color: T.bg,
@@ -292,6 +349,140 @@ function OnTheClock({ currentPicker, pickIdx, totalPicks, round, totalRounds, my
     </div>
     <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:13, color:'rgba(247,244,237,0.55)', fontVariantNumeric:'tabular-nums' }}>{pickIdx+1}/{totalPicks}</div>
   </div>;
+}
+
+// ── Pick / Board mode toggle ───────────────────────────────────────
+// Lightweight segmented control. Pick = driver pool grid for selecting.
+// Board = full snake grid showing every pick made so far. Spectators
+// (and the on-the-clock player between turns) flip to Board to see the
+// whole state at a glance, then back to Pick to act when their turn comes.
+function ModeToggle({ mode, onChange }) {
+  const opts = [
+    { id: 'pick', label: 'Pick' },
+    { id: 'board', label: 'Board' },
+  ];
+  return (
+    <div style={{
+      display: 'flex',
+      borderRadius: 3,
+      overflow: 'hidden',
+      border: `1px solid ${T.line}`,
+      background: T.card,
+    }}>
+      {opts.map(o => {
+        const active = mode === o.id;
+        return (
+          <button
+            key={o.id}
+            onClick={() => onChange(o.id)}
+            style={{
+              appearance: 'none',
+              flex: 1,
+              background: active ? T.ink : 'transparent',
+              color: active ? T.bg : T.ink,
+              border: 'none',
+              padding: '9px 16px',
+              fontFamily: FL, fontSize: 10, fontWeight: 600,
+              letterSpacing: '0.22em', textTransform: 'uppercase',
+              cursor: 'pointer',
+              transition: 'background 120ms ease, color 120ms ease',
+            }}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Latest picks strip ─────────────────────────────────────────────
+// Three most recent picks, latest on top, all rendered at full ink intensity
+// so the strip is uniformly readable. New arrivals get a brief copper-tinted
+// background that fades to transparent over ~1s, riding the existing
+// freshPickKeys signal so the visual matches the grid card flash.
+//
+// Stable React keys (`pick.at`) keep DOM nodes in place as new picks shift
+// older ones down — so only the new top row is "new", the others slide
+// without remounting. Bonus picks include a small series tag on the right
+// so the source pool is visible without having to think about it.
+function LatestPicksStrip({ picks, players, freshPickKeys, lookupDriver }) {
+  if (picks.length === 0) return null;
+  const recent = picks.slice(-3).reverse();
+  const total = picks.length;
+  return (
+    <div style={{ padding: '8px 20px 0' }}>
+      {recent.map((pk, i) => {
+        const player = players.find(p => p.id === pk.playerId);
+        const series = pk.series || 'Cup';
+        const driver = lookupDriver(series, pk.driverNum);
+        const overallNum = total - i; // 1-indexed pick number; latest = highest
+        const isFresh = freshPickKeys.has(pickKey(series, pk.driverNum));
+        return (
+          <div
+            key={`${pk.at}-${pk.driverNum}-${series}`}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 9,
+              padding: '6px 8px',
+              background: isFresh ? 'rgba(184, 147, 90, 0.22)' : 'transparent',
+              transition: 'background 1000ms ease-out',
+              borderRadius: 3,
+              borderBottom: i === recent.length - 1 ? 'none' : `0.5px solid ${T.line2}`,
+            }}
+          >
+            <span style={{
+              fontFamily: FB, fontSize: 9, fontWeight: 600,
+              fontVariantNumeric: 'tabular-nums',
+              color: T.mute, minWidth: 18, textAlign: 'right',
+              letterSpacing: '-0.01em',
+            }}>
+              {String(overallNum).padStart(2, '0')}
+            </span>
+            {player && <PlayerBadge player={player} size={18}/>}
+            <span style={{
+              fontFamily: FD, fontSize: 12, fontWeight: 600,
+              letterSpacing: '-0.02em',
+              color: T.ink,
+              whiteSpace: 'nowrap',
+              flex: '0 0 auto',
+            }}>
+              {player?.name || '—'}
+            </span>
+            <span style={{
+              fontFamily: FI, fontStyle: 'italic', fontSize: 11,
+              color: T.mute, flex: '0 0 auto',
+            }}>→</span>
+            <span style={{
+              fontFamily: FB, fontSize: 11, fontWeight: 700,
+              fontVariantNumeric: 'tabular-nums',
+              color: T.ink, letterSpacing: '-0.01em',
+              flex: '0 0 auto',
+            }}>
+              #{pk.driverNum}
+            </span>
+            <span style={{
+              fontFamily: FD, fontSize: 12, fontWeight: 600,
+              letterSpacing: '-0.02em',
+              color: T.ink,
+              flex: 1, minWidth: 0,
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+            }}>
+              {driver?.name || pk.driverName || ''}
+            </span>
+            {series !== 'Cup' && <span style={{
+              fontFamily: FL, fontSize: 8, fontWeight: 600,
+              letterSpacing: '0.2em', textTransform: 'uppercase',
+              color: T.hot, flex: '0 0 auto',
+            }}>
+              {(SERIES[series]?.short) || series.slice(0, 3).toUpperCase()}
+            </span>}
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 // ── Series tab strip ───────────────────────────────────────────────
@@ -470,6 +661,198 @@ function DraftGrid({ drivers, pickedKeys, activeSeries, draftState, players, onP
       </div>
     </div>
   </div>;
+}
+
+// ── Draft board ────────────────────────────────────────────────────
+// Full snake grid view. Columns are players in slot order (left to right);
+// rows are rounds (top to bottom). Each cell is the driver picked at that
+// (round, slot) intersection, or a dashed placeholder if the pick hasn't
+// happened yet. The on-the-clock cell gets a copper outline; freshly-landed
+// picks ride the same hm-pickring animation used in the grid for visual
+// consistency. Round labels include a snake direction arrow so the
+// chronological flow is obvious at a glance.
+function DraftBoard({ snakeOrder, picks, players, slotAssign, totalRounds, currentPickIdx, freshPickKeys, lookupDriver }) {
+  const numPlayers = players.length;
+
+  // (round, slot) → overall pick index. Lets us look up "what's at row 3,
+  // col 2?" by indexing snakeOrder, which already encodes the snake.
+  const slotByRoundIdx = useMemo(() => {
+    const grid = {};
+    for (let i = 0; i < snakeOrder.length; i++) {
+      const { round, slot } = snakeOrder[i];
+      if (!grid[round]) grid[round] = {};
+      grid[round][slot] = i;
+    }
+    return grid;
+  }, [snakeOrder]);
+
+  // Players ordered by slot 1..N so the column header reads slot-1 leftmost.
+  const playersBySlot = useMemo(() => {
+    const out = [];
+    const byId = new Map(players.map(p => [p.id, p]));
+    for (let s = 1; s <= numPlayers; s++) {
+      const entry = Object.entries(slotAssign || {}).find(([, sl]) => sl === s);
+      out.push(entry ? byId.get(entry[0]) : null);
+    }
+    return out;
+  }, [players, slotAssign, numPlayers]);
+
+  // Track-style template: 28px gutter for round labels, equal columns per player.
+  const cols = `28px repeat(${numPlayers}, minmax(0, 1fr))`;
+
+  return (
+    <div style={{ padding: '14px 14px 24px' }}>
+      {/* Player header row */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: cols,
+        gap: 4,
+        marginBottom: 8,
+        alignItems: 'flex-end',
+      }}>
+        <div/>
+        {playersBySlot.map((p, i) => (
+          <div key={i} style={{
+            display: 'flex', flexDirection: 'column',
+            alignItems: 'center', gap: 4,
+            padding: '4px 0',
+            minWidth: 0,
+          }}>
+            {p ? <PlayerBadge player={p} size={20}/> : <div style={{ width: 20, height: 20 }}/>}
+            <div style={{
+              fontFamily: FL, fontSize: 7, fontWeight: 700,
+              letterSpacing: '0.14em', textTransform: 'uppercase',
+              color: T.ink2,
+              maxWidth: '100%',
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+            }}>
+              {p?.name?.slice(0, 5) || '—'}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Round rows */}
+      {Array.from({ length: totalRounds }, (_, r) => {
+        const round = r + 1;
+        const leftToRight = round % 2 === 1;
+        const arrow = leftToRight ? '→' : '←';
+        return (
+          <div key={round} style={{
+            display: 'grid',
+            gridTemplateColumns: cols,
+            gap: 4,
+            marginBottom: 4,
+          }}>
+            {/* Round label gutter */}
+            <div style={{
+              display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center',
+              fontVariantNumeric: 'tabular-nums',
+            }}>
+              <div style={{
+                fontFamily: FB, fontSize: 11, fontWeight: 700,
+                color: T.ink2, letterSpacing: '-0.01em',
+              }}>R{round}</div>
+              <div style={{
+                fontFamily: FB, fontSize: 9,
+                color: T.mute, lineHeight: 1, marginTop: 1,
+              }}>{arrow}</div>
+            </div>
+            {playersBySlot.map((p, i) => {
+              const slot = i + 1;
+              const overallIdx = slotByRoundIdx[round]?.[slot];
+              const pk = (overallIdx != null && overallIdx < picks.length) ? picks[overallIdx] : null;
+              const series = pk?.series || 'Cup';
+              const driver = pk ? lookupDriver(series, pk.driverNum) : null;
+              const isCurrent = overallIdx === currentPickIdx;
+              const isFresh = pk ? freshPickKeys.has(pickKey(series, pk.driverNum)) : false;
+              const filled = !!pk;
+              const lastName = driver?.name?.split(' ').slice(-1)[0] || (pk?.driverName?.split(' ').slice(-1)[0]) || (pk ? `#${pk.driverNum}` : '');
+              return (
+                <div key={i} style={{
+                  position: 'relative',
+                  border: filled
+                    ? `1px solid ${T.line}`
+                    : `1px dashed ${isCurrent ? T.hot : T.line2}`,
+                  borderRadius: 4,
+                  padding: '4px 2px',
+                  height: 58,
+                  background: filled ? '#FEFCF7' : 'transparent',
+                  display: 'flex', flexDirection: 'column',
+                  alignItems: 'center', justifyContent: 'center',
+                  gap: 2,
+                  minWidth: 0,
+                  animation: isFresh ? 'hm-pickring 900ms ease-out forwards' : 'none',
+                  boxShadow: isCurrent && !filled ? `0 0 0 1px ${T.hot}, inset 0 0 0 1px rgba(184,147,90,0.18)` : 'none',
+                }}>
+                  {filled ? (
+                    driver ? <>
+                      <CarNum driver={driver} size={22}/>
+                      <div style={{
+                        fontFamily: FD, fontSize: 9, fontWeight: 600,
+                        letterSpacing: '-0.02em',
+                        color: T.ink,
+                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                        width: '100%', textAlign: 'center',
+                        lineHeight: 1.05,
+                      }}>
+                        {lastName.slice(0, 6)}
+                      </div>
+                      <div style={{
+                        position: 'absolute', top: 2, right: 3,
+                        fontFamily: FB, fontSize: 7, fontWeight: 700,
+                        color: T.mute,
+                        fontVariantNumeric: 'tabular-nums',
+                      }}>
+                        {overallIdx + 1}
+                      </div>
+                      {series !== 'Cup' && <div style={{
+                        position: 'absolute', bottom: 1, left: 2,
+                        fontFamily: FL, fontSize: 6, fontWeight: 700,
+                        color: T.hot,
+                        letterSpacing: '0.15em', textTransform: 'uppercase',
+                      }}>
+                        {SERIES[series]?.short || series.slice(0, 3).toUpperCase()}
+                      </div>}
+                    </> : <>
+                      {/* Pick exists but driver lookup failed — fallback. */}
+                      <div style={{
+                        fontFamily: FB, fontSize: 13, fontWeight: 700,
+                        color: T.ink, fontVariantNumeric: 'tabular-nums',
+                      }}>#{pk.driverNum}</div>
+                      <div style={{
+                        fontFamily: FD, fontSize: 9, color: T.mute,
+                      }}>—</div>
+                    </>
+                  ) : (
+                    <span style={{
+                      fontFamily: FI, fontStyle: 'italic',
+                      fontSize: isCurrent ? 14 : 11,
+                      color: isCurrent ? T.hot : T.line2,
+                      lineHeight: 1,
+                    }}>
+                      {isCurrent ? '⏱' : '·'}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
+
+      {/* Quiet caption — explains the arrow column without crowding the grid. */}
+      <div style={{
+        marginTop: 14,
+        fontFamily: FI, fontStyle: 'italic',
+        fontSize: 11, color: T.mute,
+        textAlign: 'center',
+      }}>
+        Snake order — direction reverses each round
+      </div>
+    </div>
+  );
 }
 
 // ── Draft-complete summary roster view ─────────────────────────────
