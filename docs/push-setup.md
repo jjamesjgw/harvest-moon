@@ -29,16 +29,18 @@ Redeploy after saving — `NEXT_PUBLIC_*` values are baked in at build time.
 
 ## 3. Supabase setup
 
-In the Supabase dashboard:
+Supabase doesn't permit `alter database ... set app.*`, so the trigger
+function inlines the notify URL and secret. Before pasting the SQL:
+
+1. Open `supabase/push.sql` from this repo.
+2. Replace `REPLACE_WITH_NOTIFY_URL` with `https://YOUR-DEPLOYMENT.vercel.app/api/notify`.
+3. Replace `REPLACE_WITH_NOTIFY_SECRET` with the same value you set for `NOTIFY_SECRET` in Vercel.
+4. **Do not commit the filled-in version.** Paste it directly into Supabase SQL editor.
+
+Then in the Supabase dashboard:
 
 1. Database → Extensions → enable **pg_net**.
-2. SQL editor → run `supabase/push.sql` (already in this repo).
-3. SQL editor → run, replacing the two values:
-
-```sql
-alter database postgres set app.notify_url    = 'https://YOUR-DEPLOYMENT.vercel.app/api/notify';
-alter database postgres set app.notify_secret = 'THE-SAME-NOTIFY-SECRET-FROM-STEP-2';
-```
+2. SQL editor → paste the modified `push.sql` → Run.
 
 ## 4. Verify
 
@@ -59,3 +61,4 @@ curl -i -X POST https://YOUR-DEPLOYMENT.vercel.app/api/notify \
 - **iOS**: Web Push only works on iOS 16.4+ AND only after the user has added the app to their Home Screen and opens it from there. The Profile screen detects this case and shows install instructions instead of a dead toggle.
 - **Expired subscriptions** (404/410) are auto-deleted from `push_subs` on the next send attempt. No retry queue.
 - **Trigger scope**: the database trigger only fires when `draftState.picks` or `weeklyResults` actually changes — profile edits and other writes don't generate HTTP traffic.
+- **Rotating `NOTIFY_SECRET`**: update the Vercel env var AND re-run the `create or replace function public.notify_league_changes()` block from `push.sql` with the new value. Both sides must match.

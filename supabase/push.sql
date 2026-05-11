@@ -1,6 +1,16 @@
 -- Harvest Moon: push-notification additions to the existing schema.
 -- Run this once in Supabase SQL editor AFTER schema.sql.
 --
+-- BEFORE RUNNING: replace REPLACE_WITH_NOTIFY_URL and REPLACE_WITH_NOTIFY_SECRET
+-- inside notify_league_changes() below with your real values, then paste the
+-- whole modified file into the SQL editor. Supabase does not permit
+-- `alter database ... set app.*`, so the values must be inlined into the
+-- function body instead of read from current_setting().
+--
+-- DO NOT COMMIT THE FILLED-IN VERSION — NOTIFY_SECRET is what gates
+-- /api/notify. Keep real values in Vercel env vars and in the live
+-- Supabase function only.
+--
 -- Prerequisite: enable the pg_net extension in Database → Extensions.
 
 -- 1. Subscriptions table (same trust model as `leagues`: world-writable).
@@ -23,11 +33,9 @@ create policy "anon all" on public.push_subs for all using (true) with check (tr
 create or replace function public.notify_league_changes()
 returns trigger language plpgsql security definer as $$
 declare
-  url    text := current_setting('app.notify_url',    true);
-  secret text := current_setting('app.notify_secret', true);
+  url    text := 'REPLACE_WITH_NOTIFY_URL';     -- e.g. https://harvest-moon.vercel.app/api/notify
+  secret text := 'REPLACE_WITH_NOTIFY_SECRET';  -- the same value as Vercel env NOTIFY_SECRET
 begin
-  if url is null or secret is null then return new; end if;
-
   perform net.http_post(
     url,
     jsonb_build_object('oldState', old.state, 'newState', new.state),
@@ -49,8 +57,3 @@ create trigger leagues_notify
     or new.state->'weeklyResults'     is distinct from old.state->'weeklyResults'
   )
   execute function public.notify_league_changes();
-
--- 4. One-time configuration. Edit these two values before running.
---    Both must match the corresponding Vercel env vars on the Next.js side.
--- alter database postgres set app.notify_url    = 'https://YOUR-DEPLOYMENT.vercel.app/api/notify';
--- alter database postgres set app.notify_secret = 'CHANGE-ME-64-RANDOM-CHARS';
