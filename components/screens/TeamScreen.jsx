@@ -75,11 +75,11 @@ export default function TeamScreen({ state, me, viewingPlayerId, onConsumeViewin
 
   return <div style={{ paddingBottom:20 }}>
     <TopBar
-      subtitle={`Wk ${String(currentWeek).padStart(2,'0')} · ${cfg.allotments && Object.keys(cfg.allotments).length > 1 ? 'Mixed series' : 'Cup'}${viewingOther ? ` · ${subject.name}` : ''}`}
-      title={viewingOther ? `${subject.name}'s Team` : 'Team'}
+      subtitle={`${subject.name} · Week ${String(currentWeek).padStart(2,'0')}`}
+      title={viewingOther ? `${subject.name}'s Team` : 'My Team'}
       right={viewingOther
         ? <LinkArrow onClick={() => onNav('team')}>My Team →</LinkArrow>
-        : null
+        : <BackChip onClick={() => onNav('home')}/>
       }
     />
 
