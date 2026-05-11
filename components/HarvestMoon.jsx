@@ -8,7 +8,7 @@ import {
 } from '@/lib/constants';
 import { DEFAULT_DRIVERS, DEFAULT_SCHEDULE } from '@/lib/data';
 import {
-  buildSlotPickOrder, buildSnakeOrder, computeStandings, getWeekConfig, makeFreshState,
+  buildSlotPickOrder, buildSnakeOrder, computeStandings, detectActiveTurn, getWeekConfig, makeFreshState,
 } from '@/lib/utils';
 import {
   AppFrame, TabBar, OnTheClockBanner, PullToRefresh, SaveBanner, YourTurnToast,
@@ -75,29 +75,6 @@ function migrateState(rawState) {
   });
   patched.adminId = ADMIN_ID;
   return patched;
-}
-
-// Computes the active draft turn: which player is on the clock and what kind
-// of pick is owed (slot or snake). Returns null when no draft is active.
-function detectActiveTurn(state) {
-  if (!state) return null;
-  const ds = state.draftState;
-  if (!ds) return null;
-  if (ds.phase === 'slot-pick') {
-    const order = buildSlotPickOrder(state.players, state.weeklyResults, state.currentWeek - 1);
-    const picker = order[ds.slotPickIdx];
-    if (picker) return { kind: 'slot', playerId: picker.id, name: picker.name };
-  }
-  if (ds.phase === 'snake') {
-    const cfg = getWeekConfig(state, state.currentWeek);
-    const order = buildSnakeOrder(state.players, ds.slotAssign, cfg.totalPicks);
-    const onClock = order[ds.picks.length];
-    if (onClock?.playerId) {
-      const player = state.players.find(p => p.id === onClock.playerId);
-      if (player) return { kind: 'snake', round: onClock.round, playerId: player.id, name: player.name };
-    }
-  }
-  return null;
 }
 
 // ─── ROOT APP ────────────────────────────────────────────────────

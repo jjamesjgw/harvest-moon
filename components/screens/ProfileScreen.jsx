@@ -4,6 +4,90 @@ import { BackChip, CarNum, Field, MenuRow, PlayerBadge, SectionLabel, TopBar, Wi
 import { ADMIN_ID, FB, FD, FI, FL, T } from '@/lib/constants';
 import { DEFAULT_DRIVERS } from '@/lib/data';
 import { computeStandings } from '@/lib/utils';
+import { disablePush, enablePush, getPushStatus } from '@/lib/push';
+
+// iOS Safari requires the PWA to be installed to the home screen before
+// the Web Push API is available. Detect that case so we can show install
+// instructions instead of a dead toggle.
+function isIOSNotStandalone() {
+  if (typeof window === 'undefined') return false;
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  if (!isIOS) return false;
+  const standalone = window.matchMedia?.('(display-mode: standalone)').matches
+    || window.navigator.standalone === true;
+  return !standalone;
+}
+
+function PushNotificationsBlock({ me }) {
+  const [status, setStatus] = useState('available'); // 'unsupported' | 'denied' | 'subscribed' | 'available'
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const iosNeedsInstall = isIOSNotStandalone();
+
+  useEffect(() => {
+    let cancelled = false;
+    getPushStatus().then(s => { if (!cancelled) setStatus(s); });
+    return () => { cancelled = true; };
+  }, []);
+
+  if (iosNeedsInstall) {
+    return <div style={{ padding:'12px 20px 8px', fontFamily: FI, fontStyle:'italic', fontSize:12, color: T.mute, lineHeight:1.5 }}>
+      To get notifications on iPhone, tap Share and choose <strong>Add to Home Screen</strong>, then open the app from your home screen.
+    </div>;
+  }
+
+  if (status === 'unsupported') {
+    return <div style={{ padding:'12px 20px 8px', fontFamily: FI, fontStyle:'italic', fontSize:12, color: T.mute, lineHeight:1.5 }}>
+      Your browser doesn't support push notifications.
+    </div>;
+  }
+
+  if (status === 'denied') {
+    return <div style={{ padding:'12px 20px 8px', fontFamily: FI, fontStyle:'italic', fontSize:12, color: T.mute, lineHeight:1.5 }}>
+      Notifications are blocked. Enable them in your browser settings for this site.
+    </div>;
+  }
+
+  const subscribed = status === 'subscribed';
+  const onClick = async () => {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = subscribed ? await disablePush() : await enablePush(me.id);
+      if (!res.ok) setError(res.reason || 'failed');
+      const next = await getPushStatus();
+      setStatus(next);
+    } catch (e) {
+      setError(e?.message || 'failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return <div style={{ padding:'12px 20px 8px' }}>
+    <button onClick={onClick} disabled={busy} style={{
+      appearance:'none', width:'100%', padding:14,
+      background: subscribed ? T.card : T.ink,
+      color: subscribed ? T.ink : T.bg,
+      border: subscribed ? `0.5px solid ${T.line2}` : 'none',
+      borderRadius:3, cursor: busy ? 'wait' : 'pointer',
+      fontFamily: FL, fontSize:11, fontWeight:500,
+      letterSpacing:'0.24em', textTransform:'uppercase',
+      opacity: busy ? 0.6 : 1,
+    }}>
+      {busy ? '…' : subscribed ? 'Turn off notifications' : 'Turn on notifications'}
+    </button>
+    <div style={{ marginTop:10, fontFamily: FI, fontStyle:'italic', fontSize:11, color: T.mute, lineHeight:1.5 }}>
+      {subscribed
+        ? 'You\'ll get a buzz when it\'s your turn to draft, when someone makes a pick, and when weekly results are posted.'
+        : 'Get notified when it\'s your turn to draft, when someone picks, or when results are posted.'}
+    </div>
+    {error && <div style={{ marginTop:8, fontFamily: FI, fontSize:11, color: T.hot }}>
+      Couldn't update notifications: {error}
+    </div>}
+  </div>;
+}
 
 // Tiny status pill rendered next to the Back chip on Profile. Mirrors the
 // useLeague saveStatus state machine: 'idle' shows nothing, 'saving' shows
@@ -145,7 +229,10 @@ export default function ProfileScreen({ state, setState, me, onBack, saveStatus 
       </div>
     </div>
 
-    <div style={{ padding:'0 20px 8px', fontFamily: FI, fontStyle:'italic', fontSize:11, color: T.mute, textAlign:'center', lineHeight:1.5 }}>
+    <SectionLabel style={{ marginTop:10 }}>Notifications</SectionLabel>
+    <PushNotificationsBlock me={me}/>
+
+    <div style={{ padding:'12px 20px 8px', fontFamily: FI, fontStyle:'italic', fontSize:11, color: T.mute, textAlign:'center', lineHeight:1.5 }}>
       Changes save automatically as you type.
     </div>
     <div style={{ padding:'0 20px 24px' }}>
