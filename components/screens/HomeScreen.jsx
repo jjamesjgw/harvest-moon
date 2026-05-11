@@ -1,9 +1,54 @@
 'use client';
 import React from 'react';
-import { LinkArrow, PlayerBadge, RaceCountdown, SectionLabel, TopBar } from '@/components/ui/primitives';
+import { CarNum, LinkArrow, PlayerBadge, RaceCountdown, SectionLabel, TopBar } from '@/components/ui/primitives';
 import { InstallHint } from '@/components/ui/InstallHint';
 import { ADMIN_ID, FB, FD, FI, FL, T } from '@/lib/constants';
-import { computeStandings, getWeekConfig, ordinalSuffix, raceCountdown } from '@/lib/utils';
+import { computeAllDriverStats, computeStandings, getWeekConfig, ordinalSuffix, raceCountdown } from '@/lib/utils';
+
+const STAT_AWARDS = [
+  { key: 'topScorer',   label: 'Top Scorer',   metric: r => `${r.totalPts} pts`,   sub: r => `${r.totalPicks}× drafted` },
+  { key: 'mostPicked',  label: 'Most Drafted', metric: r => `${r.totalPicks}×`,    sub: r => `${r.avgPts} avg`        },
+  { key: 'bestSleeper', label: 'Sleeper',      metric: r => `${r.avgPts} avg`,     sub: r => `${r.totalPicks}× drafted` },
+];
+
+function StatOfTheSeason({ state, onNav }) {
+  const all = React.useMemo(() => computeAllDriverStats(state), [state]);
+  // Rotate weekly. Fall through to the next non-null award if the
+  // selected slot is empty (e.g. Wk 1 before any race finalized).
+  const wk = state.currentWeek || 1;
+  let slot = null;
+  let driver = null;
+  for (let i = 0; i < STAT_AWARDS.length; i++) {
+    const candidate = STAT_AWARDS[(wk + i) % STAT_AWARDS.length];
+    const d = all.awards?.[candidate.key];
+    if (d) { slot = candidate; driver = d; break; }
+  }
+  if (!driver) return null;
+  return <>
+    <SectionLabel right={<LinkArrow onClick={() => onNav('drivers')}>All →</LinkArrow>}>
+      Stat of the Season · {slot.label}
+    </SectionLabel>
+    <div style={{ padding:'14px 20px 20px' }}>
+      <button
+        onClick={() => onNav('drivers', { driverNum: driver.num })}
+        style={{
+          appearance:'none', width:'100%', textAlign:'left',
+          background: T.card, border:`1px solid ${T.line2}`, borderRadius:6,
+          padding:'12px 14px', cursor:'pointer',
+          display:'flex', alignItems:'center', gap:12,
+        }}>
+        <CarNum driver={driver} size={36}/>
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ fontFamily: FD, fontSize:16, fontWeight:600, letterSpacing:'-0.02em' }}>{driver.name}</div>
+          <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:11, color: T.mute, marginTop:2 }}>
+            № {driver.num} · {driver.team} · {slot.sub(driver)}
+          </div>
+        </div>
+        <div style={{ fontFamily: FB, fontSize:18, fontWeight:600, color: T.hot, fontVariantNumeric:'tabular-nums' }}>{slot.metric(driver)}</div>
+      </button>
+    </div>
+  </>;
+}
 
 export default function HomeScreen({ state, me, onNav }) {
   const { players, schedule, currentWeek, weeklyResults, draftState } = state;
@@ -161,6 +206,8 @@ export default function HomeScreen({ state, me, onNav }) {
         </div>
       </div>
     </div>
+
+    <StatOfTheSeason state={state} onNav={onNav}/>
 
     {/* Your standing */}
     <div style={{ padding:'0 20px 20px' }}>
