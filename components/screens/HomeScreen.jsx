@@ -5,6 +5,7 @@ import { InstallHint } from '@/components/ui/InstallHint';
 import { ADMIN_ID, FB, FD, FI, FL, T } from '@/lib/constants';
 import { computeAllDriverStats, computeStandings, getWeekConfig, ordinalSuffix, raceCountdown } from '@/lib/utils';
 import { DEFAULT_DRIVERS } from '@/lib/data';
+import { RACE_QUOTES } from '@/lib/quotes';
 
 const STAT_AWARDS = [
   { key: 'topScorer',   label: 'Top Scorer',   metric: r => `${r.totalPts} pts`,   sub: r => `${r.totalPicks}× drafted` },
@@ -173,6 +174,38 @@ function LastRaceStrip({ state, me, onNav }) {
       </button>
     </div>
   </>;
+}
+
+function RaceQuote({ state }) {
+  const wk = state.currentWeek || 1;
+  const quote = RACE_QUOTES[(wk - 1) % RACE_QUOTES.length];
+  if (!quote) return null;
+  return <div style={{ padding:'10px 20px 28px' }}>
+    <div style={{
+      background: T.card, border:`1px solid ${T.line2}`, borderRadius:6,
+      padding:'18px 20px 20px', position:'relative',
+    }}>
+      <span style={{
+        position:'absolute', top:6, left:14,
+        fontFamily: FI, fontStyle:'italic', fontSize:48,
+        color: 'rgba(184,147,90,0.35)', lineHeight:1,
+      }}>“</span>
+      <div style={{
+        fontFamily: FI, fontStyle:'italic', fontSize:15,
+        color: T.ink, lineHeight:1.5, letterSpacing:'0.005em',
+        paddingLeft:24,
+      }}>{quote.text}</div>
+      <div style={{
+        fontFamily: FL, fontSize:10, fontWeight:600,
+        letterSpacing:'0.22em', textTransform:'uppercase',
+        color: T.hot, marginTop:12, paddingLeft:24,
+      }}>— {quote.speaker}</div>
+      {quote.context && <div style={{
+        fontFamily: FI, fontStyle:'italic', fontSize:11,
+        color: T.mute, marginTop:3, paddingLeft:24,
+      }}>{quote.context}</div>}
+    </div>
+  </div>;
 }
 
 export default function HomeScreen({ state, me, onNav }) {
@@ -381,5 +414,7 @@ export default function HomeScreen({ state, me, onNav }) {
         ))}
       </div>
     </>}
+
+    <RaceQuote state={state}/>
   </div>;
 }
