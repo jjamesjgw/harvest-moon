@@ -133,7 +133,7 @@ function LastRaceStrip({ state, me, onNav }) {
   // Order entries descending to compute your finish position.
   const sorted = [...entries].sort((a, b) => b.pts - a.pts);
   const myRank = sorted.findIndex(e => e.id === me.id) + 1;
-  const ord = ['th','st','nd','rd'][((myRank % 100 - 20) % 10) >= 0 && ((myRank % 100 - 20) % 10) <= 3 ? ((myRank % 100 - 20) % 10) : 0] || 'th';
+  const ord = ordinalSuffix(myRank);
 
   // Build label
   const winnerName = winners.map(w => w.name).join(' & ');
