@@ -405,7 +405,7 @@ export function JustPickedToast({ player, driver, onTap, onDismiss }) {
   </button>;
 }
 
-export function YourTurnToast({ kind, onGo }) {
+export function YourTurnToast({ kind, progress, onGo }) {
   return <button onClick={onGo} style={{
     appearance:'none', display:'flex', alignItems:'center', gap:12,
     background:'linear-gradient(180deg, #C9A268 0%, #B8935A 50%, #9A7A48 100%)',
@@ -424,6 +424,18 @@ export function YourTurnToast({ kind, onGo }) {
         {kind === 'slot' ? 'Pick your draft slot →' : 'Make your driver pick →'}
       </div>
     </div>
+    {progress && <div style={{ textAlign:'right', flexShrink:0, marginLeft:8 }}>
+      <div style={{
+        fontFamily: FL, fontSize:9, fontWeight:600,
+        letterSpacing:'0.22em', textTransform:'uppercase',
+        color:'rgba(20,17,13,0.55)',
+      }}>{progress.label}</div>
+      <div style={{
+        fontFamily: FB, fontSize:12, fontWeight:600,
+        color: T.ink, marginTop:1,
+        fontVariantNumeric:'tabular-nums',
+      }}>{progress.value}</div>
+    </div>}
   </button>;
 }
 

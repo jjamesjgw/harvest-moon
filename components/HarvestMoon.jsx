@@ -270,7 +270,10 @@ export default function App() {
   // turn information natively (slot, draft).
   const onDraftScreen = screen === 'slot' || screen === 'draft';
   const turnToast = myTurnInfo && !onDraftScreen
-    ? <YourTurnToast kind={myTurnInfo.kind} onGo={() => onNav('draft')}/>
+    ? <YourTurnToast
+        kind={myTurnInfo.kind}
+        progress={draftProgressLabel(state)}
+        onGo={() => onNav('draft')}/>
     : null;
   const draftBanner = activeTurn && !isMyTurn && !onDraftScreen
     ? <OnTheClockBanner
