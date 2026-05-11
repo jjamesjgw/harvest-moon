@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import crypto from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
+import { rollupPts } from '@/lib/scoring';
 import { parseRaceTime } from '@/lib/utils';
 import {
   deriveWikiSlug,
@@ -35,28 +36,6 @@ function authorized(req) {
     if (a.length === b.length && crypto.timingSafeEqual(a, b)) return true;
   }
   return false;
-}
-
-// Mirrors EnterResultsScreen.rollupPts. Duplicated because the screen file
-// is 'use client' and can't be imported into a server route. If the
-// formula changes, update both.
-const lookupPts = (driverPoints, series, num) => {
-  const k = `${series || 'Cup'}:${num}`;
-  if (Object.prototype.hasOwnProperty.call(driverPoints, k)) return driverPoints[k];
-  if ((series || 'Cup') === 'Cup' && Object.prototype.hasOwnProperty.call(driverPoints, num)) {
-    return driverPoints[num];
-  }
-  return undefined;
-};
-function rollupPts(players, picks, driverPoints = {}, bonuses = {}, overrides = {}) {
-  const pts = {};
-  for (const p of players) {
-    const myPicks = picks.filter(pk => pk.playerId === p.id);
-    const base = myPicks.reduce((s, pk) => s + (lookupPts(driverPoints, pk.series, pk.driverNum) || 0), 0);
-    const o = overrides[p.id];
-    pts[p.id] = o != null ? o : (base + (bonuses[p.id] || 0));
-  }
-  return pts;
 }
 
 // Pick the wk whose race ended ≥4h ago and which doesn't yet have any Cup

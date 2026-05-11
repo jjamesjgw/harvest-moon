@@ -3,37 +3,8 @@ import React, { useState } from 'react';
 import { BackChip, CarNum, LabeledInput, PlayerBadge, SectionLabel, TopBar } from '@/components/ui/primitives';
 import { ADMIN_ID, FB, FD, FI, FL, FM, SERIES, T } from '@/lib/constants';
 import { DEFAULT_DRIVERS } from '@/lib/data';
+import { ptsKey, lookupPts, rollupPts } from '@/lib/scoring';
 import { getBonusPool, getWeekConfig } from '@/lib/utils';
-
-// Composite key for driverPoints. For weeks PRE-bonus-rollout, picks lacked
-// `series` and driverPoints was keyed by raw num. We support both formats:
-// reads check both, writes always use the new composite form.
-const ptsKey = (series, num) => `${series || 'Cup'}:${num}`;
-const lookupPts = (driverPoints, series, num) => {
-  const k = ptsKey(series, num);
-  if (Object.prototype.hasOwnProperty.call(driverPoints, k)) return driverPoints[k];
-  // Legacy fallback: old shape used flat num keys (only Cup picks existed).
-  if ((series || 'Cup') === 'Cup' && Object.prototype.hasOwnProperty.call(driverPoints, num)) {
-    return driverPoints[num];
-  }
-  return undefined;
-};
-
-// Per-player rollup. Sums the points of every drafted driver, plus optional
-// bonuses, plus optional overrides. Bonus picks count exactly the same as Cup
-// picks toward the player's weekly total — they're indistinguishable in the
-// math, just stored under different driverPoints keys.
-function rollupPts(players, picks, driverPoints = {}, bonuses = {}, overrides = {}) {
-  const pts = {};
-  players.forEach(p => {
-    const myPicks = picks.filter(pk => pk.playerId === p.id);
-    const base = myPicks.reduce((sum, pk) => sum + (lookupPts(driverPoints, pk.series, pk.driverNum) || 0), 0);
-    const b = bonuses[p.id] || 0;
-    const o = overrides[p.id];
-    pts[p.id] = o != null ? o : (base + b);
-  });
-  return pts;
-}
 
 export default function EnterResultsScreen({ state, setState, me, onNav, editWeek }) {
   const targetWeek = editWeek || state.currentWeek;
