@@ -4,6 +4,7 @@ import { CarNum, LinkArrow, PlayerBadge, RaceCountdown, SectionLabel, TopBar } f
 import { InstallHint } from '@/components/ui/InstallHint';
 import { ADMIN_ID, FB, FD, FI, FL, T } from '@/lib/constants';
 import { computeAllDriverStats, computeStandings, getWeekConfig, ordinalSuffix, raceCountdown } from '@/lib/utils';
+import { DEFAULT_DRIVERS } from '@/lib/data';
 
 const STAT_AWARDS = [
   { key: 'topScorer',   label: 'Top Scorer',   metric: r => `${r.totalPts} pts`,   sub: r => `${r.totalPicks}× drafted` },
@@ -46,6 +47,72 @@ function StatOfTheSeason({ state, onNav }) {
         </div>
         <div style={{ fontFamily: FB, fontSize:18, fontWeight:600, color: T.hot, fontVariantNumeric:'tabular-nums' }}>{slot.metric(driver)}</div>
       </button>
+    </div>
+  </>;
+}
+
+function YourRosterStrip({ state, me, onNav }) {
+  const { currentWeek, draftState, weeklyResults } = state;
+  const myPicks = (draftState?.picks || []).filter(p => p.playerId === me.id);
+
+  // Resolve each pick to its driver (Cup uses DEFAULT_DRIVERS + week extras;
+  // bonus series come from bonusDriversByWeek). We keep series alongside the
+  // resolved driver so the chip can render a small series tag for non-Cup.
+  const wkExtras = (state.weekDriversExtra || {})[currentWeek] || [];
+  const cupPool = [...DEFAULT_DRIVERS, ...wkExtras];
+  const resolved = myPicks.map(pk => {
+    const series = pk.series || 'Cup';
+    const pool = series === 'Cup'
+      ? cupPool
+      : (state.bonusDriversByWeek?.[currentWeek]?.[series] || []);
+    const driver = pool.find(d => d.num === pk.driverNum)
+      || { num: pk.driverNum, name: pk.driverName || `#${pk.driverNum}`, primary: T.mute, secondary: T.ink };
+    return { series, driver };
+  });
+
+  const wkResult = (weeklyResults || []).find(w => w.wk === currentWeek);
+  const myWkPts = wkResult?.pts?.[me.id];
+
+  return <>
+    <SectionLabel right={<LinkArrow onClick={() => onNav('team')}>View →</LinkArrow>}>
+      Your Roster · Wk {String(currentWeek).padStart(2,'0')}
+    </SectionLabel>
+    <div style={{ padding:'14px 20px 20px' }}>
+      <div style={{
+        background: T.card, border:`1px solid ${T.line2}`, borderRadius:6,
+        padding:'12px 14px',
+        display:'flex', alignItems:'center', gap:10,
+      }}>
+        {resolved.length === 0 ? <>
+          {[0,1,2,3].map(i => <div key={i} style={{
+            width:36, height:36, borderRadius:4,
+            background:'rgba(20,17,13,0.06)',
+            border:`0.5px dashed ${T.line2}`,
+          }}/>)}
+          <div style={{ flex:1, fontFamily: FI, fontStyle:'italic', fontSize:12, color: T.mute, marginLeft:6 }}>
+            Drafting…
+          </div>
+        </> : <>
+          <div style={{ display:'flex', gap:6, flexWrap:'wrap', flex:1 }}>
+            {resolved.map(({ series, driver }, i) => <div key={`${series}:${driver.num}:${i}`} style={{ display:'inline-flex', alignItems:'center' }}>
+              <CarNum driver={driver} size={32} onClick={series === 'Cup' ? () => onNav('drivers', { driverNum: driver.num }) : undefined}/>
+              {series !== 'Cup' && <span style={{
+                marginLeft:-4, padding:'1px 4px', borderRadius:2,
+                background: T.hot, color:'#fff',
+                fontFamily: FL, fontSize:7, fontWeight:700,
+                letterSpacing:'0.16em', textTransform:'uppercase',
+                alignSelf:'flex-start',
+              }}>{series.slice(0,3)}</span>}
+            </div>)}
+          </div>
+          <div style={{ textAlign:'right', flexShrink:0 }}>
+            <div style={{ fontFamily: FL, fontSize:8, fontWeight:600, letterSpacing:'0.22em', textTransform:'uppercase', color: T.mute }}>Wk Pts</div>
+            <div style={{ fontFamily: FB, fontSize:18, fontWeight:600, color: T.ink, marginTop:2, fontVariantNumeric:'tabular-nums' }}>
+              {myWkPts != null ? myWkPts : '—'}
+            </div>
+          </div>
+        </>}
+      </div>
     </div>
   </>;
 }
@@ -208,6 +275,8 @@ export default function HomeScreen({ state, me, onNav }) {
     </div>
 
     <StatOfTheSeason state={state} onNav={onNav}/>
+
+    <YourRosterStrip state={state} me={me} onNav={onNav}/>
 
     {/* Your standing */}
     <div style={{ padding:'0 20px 20px' }}>
