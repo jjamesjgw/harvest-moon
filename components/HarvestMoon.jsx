@@ -381,7 +381,7 @@ export default function App() {
     'enter-results': <EnterResultsScreen  state={state} setState={setState} me={me} onNav={onNav}/>,
     'edit-results':  <EnterResultsScreen  state={state} setState={setState} me={me} onNav={(id, p) => { if (id === 'back') setEditingWeek(null); onNav(id, p); }} editWeek={editingWeek}/>,
     standings:       <StandingsScreen     state={state} me={me} onNav={onNav}/>,
-    team:            <TeamScreen          state={state} me={me} onNav={onNav}/>,
+    team:            <TeamScreen          state={state} me={me} viewingPlayerId={pendingViewingPlayerId} onConsumeViewingPlayer={() => setPendingViewingPlayerId(null)} onNav={onNav}/>,
     recap:           <RecapScreen         state={state} onNav={onNav}/>,
     more:            <MoreScreen          state={state} me={me} onNav={onNav} onReset={resetSeason} onSignOut={() => setMeId(null)}/>,
     profile:         <ProfileScreen       state={state} setState={setState} me={me} saveStatus={saveStatus} onBack={() => onNav('back')}/>,
