@@ -392,7 +392,7 @@ export default function App() {
     team:            <TeamScreen          state={state} me={me} viewingPlayerId={pendingViewingPlayerId} onConsumeViewingPlayer={() => setPendingViewingPlayerId(null)} onNav={onNav}/>,
     recap:           <RecapScreen         state={state} onNav={onNav} viewWk={pendingRecapWk} onConsumeViewWk={() => setPendingRecapWk(null)}/>,
     more:            <MoreScreen          state={state} me={me} onNav={onNav} onReset={resetSeason} onSignOut={() => setMeId(null)}/>,
-    profile:         <ProfileScreen       state={state} setState={setState} me={me} saveStatus={saveStatus} onBack={() => onNav('back')} onNav={onNav}/>,
+    profile:         <ProfileScreen       state={state} setState={setState} me={me} saveStatus={saveStatus} onBack={() => onNav('back')}/>,
     schedule:        <ScheduleScreen      state={state} onNav={onNav} onBack={() => onNav('back')}/>,
     history:         <HistoryScreen       state={state} me={me} onBack={() => onNav('back')} onNav={onNav} onEdit={(wk) => { setEditingWeek(wk); onNav('edit-results'); }}/>,
     rules:           <RulesScreen         state={state} onBack={() => onNav('back')}/>,
