@@ -35,14 +35,22 @@ export function CarNum({ driver, size = 38, onClick }) {
   return <div style={baseStyle}>{driver.num}</div>;
 }
 
-export function PlayerBadge({ player, size = 22, style = {} }) {
-  return <div style={{
+export function PlayerBadge({ player, size = 22, style = {}, onClick }) {
+  const baseStyle = {
     width:size, height:size, borderRadius:'50%',
     background: player.color, color:'#fff',
     display:'inline-flex', alignItems:'center', justifyContent:'center',
     fontFamily: FL, fontWeight:600, fontSize: size * 0.45,
     lineHeight:1, flexShrink:0, ...style,
-  }}>{player.initial || player.name[0].toUpperCase()}</div>;
+  };
+  if (onClick) {
+    return <button
+      onClick={(e) => { e.stopPropagation(); onClick(player); }}
+      style={{ ...baseStyle, appearance:'none', padding:0, cursor:'pointer', border:'none' }}
+      aria-label={`Open ${player.name}'s team`}
+    >{player.initial || player.name[0].toUpperCase()}</button>;
+  }
+  return <div style={baseStyle}>{player.initial || player.name[0].toUpperCase()}</div>;
 }
 
 export function SectionLabel({ children, right, style = {} }) {
