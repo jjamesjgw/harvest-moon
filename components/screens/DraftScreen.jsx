@@ -295,6 +295,7 @@ export default function DraftScreen({ state, setState, me, onNav }) {
       onAddDriver={() => onNav('manage-drivers')}
       driverStats={driverStats}
       freshPickKeys={freshPickKeys}
+      onNav={onNav}
     />}
 
     {!done && mode === 'board' && <DraftBoard
@@ -306,6 +307,7 @@ export default function DraftScreen({ state, setState, me, onNav }) {
       currentPickIdx={pickIdx}
       freshPickKeys={freshPickKeys}
       lookupDriver={lookupDriver}
+      onNav={onNav}
     />}
 
     {!done && mode === 'pick' && activeSeries === 'Cup' && isAdmin && <div style={{ padding:'0 20px 24px' }}>
@@ -530,7 +532,7 @@ function SeriesTabs({ cfg, picks, pickerId, active, onSelect, bonusPools }) {
 }
 
 // ── Driver pool grid ───────────────────────────────────────────────
-function DraftGrid({ drivers, pickedKeys, activeSeries, draftState, players, onPick, remaining, isEmpty, isAdmin, onAddDriver, driverStats, freshPickKeys }) {
+function DraftGrid({ drivers, pickedKeys, activeSeries, draftState, players, onPick, remaining, isEmpty, isAdmin, onAddDriver, driverStats, freshPickKeys, onNav }) {
   if (isEmpty) {
     const meta = SERIES[activeSeries] || { label: activeSeries };
     return <div style={{ padding:'24px 20px' }}>
@@ -671,7 +673,7 @@ function DraftGrid({ drivers, pickedKeys, activeSeries, draftState, players, onP
 // picks ride the same hm-pickring animation used in the grid for visual
 // consistency. Round labels include a snake direction arrow so the
 // chronological flow is obvious at a glance.
-function DraftBoard({ snakeOrder, picks, players, slotAssign, totalRounds, currentPickIdx, freshPickKeys, lookupDriver }) {
+function DraftBoard({ snakeOrder, picks, players, slotAssign, totalRounds, currentPickIdx, freshPickKeys, lookupDriver, onNav }) {
   const numPlayers = players.length;
 
   // (round, slot) → overall pick index. Lets us look up "what's at row 3,
