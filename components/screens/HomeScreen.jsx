@@ -117,6 +117,64 @@ function YourRosterStrip({ state, me, onNav }) {
   </>;
 }
 
+function LastRaceStrip({ state, me, onNav }) {
+  const prevWk = (state.currentWeek || 1) - 1;
+  const prev = (state.weeklyResults || []).find(w => w.wk === prevWk);
+  if (!prev?.finalized) return null;
+
+  const track = state.schedule.find(s => s.wk === prevWk)?.track || prev.track;
+  const ptsMap = prev.pts || {};
+  const myPts = ptsMap[me.id] || 0;
+  const entries = state.players.map(p => ({ id: p.id, name: p.name, pts: ptsMap[p.id] || 0 }));
+  const topPts = Math.max(...entries.map(e => e.pts));
+  const winners = entries.filter(e => e.pts === topPts);
+  const youWon = winners.some(w => w.id === me.id);
+
+  // Order entries descending to compute your finish position.
+  const sorted = [...entries].sort((a, b) => b.pts - a.pts);
+  const myRank = sorted.findIndex(e => e.id === me.id) + 1;
+  const ord = ['th','st','nd','rd'][((myRank % 100 - 20) % 10) >= 0 && ((myRank % 100 - 20) % 10) <= 3 ? ((myRank % 100 - 20) % 10) : 0] || 'th';
+
+  // Build label
+  const winnerName = winners.map(w => w.name).join(' & ');
+  const body = youWon
+    ? `You won the week (${myPts} pts) 🏆`
+    : `You: ${myRank}${ord} (${myPts}) · ${winnerName} won the week (${topPts})`;
+
+  return <>
+    <SectionLabel right={<LinkArrow onClick={() => onNav('recap', { wk: prevWk })}>Recap →</LinkArrow>}>
+      Last Race
+    </SectionLabel>
+    <div style={{ padding:'14px 20px 20px' }}>
+      <button
+        onClick={() => onNav('recap', { wk: prevWk })}
+        style={{
+          appearance:'none', width:'100%', textAlign:'left',
+          background: youWon
+            ? 'linear-gradient(180deg, #C9A268 0%, #B8935A 100%)'
+            : T.card,
+          color: youWon ? T.ink : T.ink,
+          border: youWon
+            ? '1px solid rgba(255,255,255,0.18)'
+            : `1px solid ${T.line2}`,
+          borderRadius:6, padding:'12px 14px', cursor:'pointer',
+          display:'flex', alignItems:'center', gap:12,
+        }}>
+        <div style={{
+          fontFamily: FL, fontSize:9, fontWeight:600,
+          letterSpacing:'0.22em', textTransform:'uppercase',
+          color: youWon ? 'rgba(20,17,13,0.65)' : T.mute,
+          flexShrink:0,
+        }}>Wk {String(prevWk).padStart(2,'0')}</div>
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ fontFamily: FD, fontSize:14, fontWeight:600, letterSpacing:'-0.02em', lineHeight:1.1 }}>{track}</div>
+          <div style={{ fontFamily: FB, fontSize:12, marginTop:3, lineHeight:1.4 }}>{body}</div>
+        </div>
+      </button>
+    </div>
+  </>;
+}
+
 export default function HomeScreen({ state, me, onNav }) {
   const { players, schedule, currentWeek, weeklyResults, draftState } = state;
   // After Wk 36 is finalized, currentWeek can advance to 37+ until reset. Show
@@ -277,6 +335,8 @@ export default function HomeScreen({ state, me, onNav }) {
     <StatOfTheSeason state={state} onNav={onNav}/>
 
     <YourRosterStrip state={state} me={me} onNav={onNav}/>
+
+    <LastRaceStrip state={state} me={me} onNav={onNav}/>
 
     {/* Your standing */}
     <div style={{ padding:'0 20px 20px' }}>

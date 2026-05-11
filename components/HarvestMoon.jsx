@@ -113,6 +113,10 @@ export default function App() {
   // is tapped anywhere in the app; cleared on Back, on explicit Team-tab
   // taps, and once TeamScreen consumes it.
   const [pendingViewingPlayerId, setPendingViewingPlayerId] = useState(null);
+  // Deep-link target for RecapScreen when navigated via Home's Last Race
+  // strip or similar entry points. Defaults to "latest finalized week"
+  // when null. Same consume-on-mount pattern as the driver / player stashes.
+  const [pendingRecapWk, setPendingRecapWk] = useState(null);
 
   const contentRef = useRef(null);
   const lastTurnRef = useRef(null);
@@ -225,6 +229,7 @@ export default function App() {
   const goBack = () => {
     setPendingDriverNum(null); // never carry deep-link state across back
     setPendingViewingPlayerId(null);
+    setPendingRecapWk(null);
     const prev = historyRef.current.pop();
     setScreen(prev || 'home');
   };
@@ -249,6 +254,9 @@ export default function App() {
     }
     if (payload?.playerId != null) {
       setPendingViewingPlayerId(payload.playerId);
+    }
+    if (payload?.wk != null) {
+      setPendingRecapWk(payload.wk);
     }
     // Explicit Team-tab tap (no payload) always returns to "your team."
     // Without this, a stale viewing stash could outlast the user's intent.
@@ -382,7 +390,7 @@ export default function App() {
     'edit-results':  <EnterResultsScreen  state={state} setState={setState} me={me} onNav={(id, p) => { if (id === 'back') setEditingWeek(null); onNav(id, p); }} editWeek={editingWeek}/>,
     standings:       <StandingsScreen     state={state} me={me} onNav={onNav}/>,
     team:            <TeamScreen          state={state} me={me} viewingPlayerId={pendingViewingPlayerId} onConsumeViewingPlayer={() => setPendingViewingPlayerId(null)} onNav={onNav}/>,
-    recap:           <RecapScreen         state={state} onNav={onNav}/>,
+    recap:           <RecapScreen         state={state} onNav={onNav} viewWk={pendingRecapWk} onConsumeViewWk={() => setPendingRecapWk(null)}/>,
     more:            <MoreScreen          state={state} me={me} onNav={onNav} onReset={resetSeason} onSignOut={() => setMeId(null)}/>,
     profile:         <ProfileScreen       state={state} setState={setState} me={me} saveStatus={saveStatus} onBack={() => onNav('back')}/>,
     schedule:        <ScheduleScreen      state={state} onNav={onNav} onBack={() => onNav('back')}/>,

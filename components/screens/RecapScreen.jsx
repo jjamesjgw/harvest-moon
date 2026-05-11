@@ -17,8 +17,16 @@ function SeriesTag({ series }) {
   }}>{meta.short}</span>;
 }
 
-export default function RecapScreen({ state, onNav }) {
+export default function RecapScreen({ state, onNav, viewWk, onConsumeViewWk }) {
   const { players, weeklyResults, draftHistory = [] } = state;
+
+  // Consume the deep-link stash on mount so back/forward navigation can't
+  // accidentally re-open the same week.
+  React.useEffect(() => {
+    if (viewWk != null) onConsumeViewWk?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewWk]);
+
   if (weeklyResults.length === 0) {
     return <div style={{ paddingBottom:20 }}>
       <TopBar title="Race Recap" right={<BackChip onClick={() => onNav('more')}/>}/>
@@ -29,7 +37,11 @@ export default function RecapScreen({ state, onNav }) {
       </div>
     </div>;
   }
-  const last = weeklyResults.sort((a,b) => b.wk - a.wk)[0];
+
+  // viewWk lets Home (or any caller) deep-link to a specific finalized
+  // week. Falls back to the most-recent finalized week when null.
+  const explicit = viewWk != null ? weeklyResults.find(w => w.wk === viewWk) : null;
+  const last = explicit || weeklyResults.slice().sort((a,b) => b.wk - a.wk)[0];
   const sortedRes = players.map(p => ({ ...p, pts: last.pts[p.id] || 0 })).sort((a,b) => b.pts - a.pts);
   const hist = draftHistory.find(h => h.wk === last.wk);
   const raceMeta = (state.schedule || []).find(s => s.wk === last.wk);
