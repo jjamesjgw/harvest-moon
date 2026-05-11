@@ -122,7 +122,7 @@ function SaveStatusPill({ status }) {
   }}>{isOk ? '✓ Saved' : 'Saving…'}</span>;
 }
 
-export default function ProfileScreen({ state, setState, me, onBack, saveStatus }) {
+export default function ProfileScreen({ state, setState, me, onBack, onNav, saveStatus }) {
   const isAdmin = me.id === ADMIN_ID;
   const update = (field, val) => {
     if (isAdmin) return;
@@ -217,7 +217,7 @@ export default function ProfileScreen({ state, setState, me, onBack, saveStatus 
             background: T.card, padding:6, borderRadius:4, cursor:'pointer', flexShrink:0,
             display:'flex', flexDirection:'column', alignItems:'center', gap:4, minWidth:64,
           }}>
-            <CarNum driver={d} size={32}/>
+            <CarNum driver={d} size={32} onClick={() => onNav('drivers', { driverNum: d.num })}/>
             <span style={{ fontFamily: FD, fontSize:11, fontWeight:600, letterSpacing:'-0.03em' }}>{d.name.slice(0,8)}</span>
           </button>
         ))}

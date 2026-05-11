@@ -615,7 +615,7 @@ function DraftGrid({ drivers, pickedKeys, activeSeries, draftState, players, onP
               // After the 400ms run completes it stays in place.
               animation: isFresh ? 'hm-tagslide 400ms cubic-bezier(0.32,0.72,0,1) both' : 'none',
             }}>{takenPl.name.slice(0,3)}</div>}
-            <CarNum driver={d} size={48}/>
+            <CarNum driver={d} size={48} onClick={activeSeries === 'Cup' ? () => onNav('drivers', { driverNum: d.num }) : undefined}/>
             <div style={{
               fontFamily: FD, fontSize:13, fontWeight:600,
               lineHeight:1.1, letterSpacing:'-0.02em',
@@ -788,7 +788,7 @@ function DraftBoard({ snakeOrder, picks, players, slotAssign, totalRounds, curre
                 }}>
                   {filled ? (
                     driver ? <>
-                      <CarNum driver={driver} size={22}/>
+                      <CarNum driver={driver} size={22} onClick={series === 'Cup' ? () => onNav('drivers', { driverNum: driver.num }) : undefined}/>
                       <div style={{
                         fontFamily: FD, fontSize: 9, fontWeight: 600,
                         letterSpacing: '-0.02em',
@@ -894,7 +894,7 @@ function DraftComplete({ state, onNav, cupDrivers }) {
                 {seriesPicks.map(pk => {
                   const d = lookupDriver(series, pk.driverNum);
                   return d
-                    ? <CarNum key={`${series}:${pk.driverNum}`} driver={d} size={32}/>
+                    ? <CarNum key={`${series}:${pk.driverNum}`} driver={d} size={32} onClick={series === 'Cup' ? () => onNav('drivers', { driverNum: d.num }) : undefined}/>
                     : <div key={`${series}:${pk.driverNum}`} style={{
                         width:32, height:32, borderRadius:4,
                         background: T.bg2, color: T.mute,
