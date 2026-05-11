@@ -605,7 +605,7 @@ export function WinsCount({ wins, compact = false, style = {} }) {
   </span>;
 }
 
-export function OnTheClockBanner({ pickerName, onTap }) {
+export function OnTheClockBanner({ pickerName, progress, onTap }) {
   if (!pickerName) return null;
   return <button onClick={onTap} style={{
     appearance:'none', display:'flex', alignItems:'center', gap:10,
@@ -629,6 +629,18 @@ export function OnTheClockBanner({ pickerName, onTap }) {
         whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis',
       }}>{pickerName} is on the clock</div>
     </div>
+    {progress && <div style={{ textAlign:'right', flexShrink:0, marginRight:8 }}>
+      <div style={{
+        fontFamily: FL, fontSize:9, fontWeight:600,
+        letterSpacing:'0.22em', textTransform:'uppercase',
+        color:'rgba(247,244,237,0.55)',
+      }}>{progress.label}</div>
+      <div style={{
+        fontFamily: FB, fontSize:11, fontWeight:600,
+        color:'rgba(247,244,237,0.85)', marginTop:1,
+        fontVariantNumeric:'tabular-nums',
+      }}>{progress.value}</div>
+    </div>}
     <span style={{
       fontFamily: FL, fontSize:9, fontWeight:600,
       letterSpacing:'0.22em', textTransform:'uppercase',

@@ -8,7 +8,7 @@ import {
 } from '@/lib/constants';
 import { DEFAULT_DRIVERS, DEFAULT_SCHEDULE } from '@/lib/data';
 import {
-  buildSlotPickOrder, buildSnakeOrder, computeStandings, detectActiveTurn, getWeekConfig, makeFreshState,
+  buildSlotPickOrder, buildSnakeOrder, computeStandings, detectActiveTurn, getWeekConfig, makeFreshState, draftProgressLabel,
 } from '@/lib/utils';
 import {
   AppFrame, TabBar, OnTheClockBanner, PullToRefresh, SaveBanner, YourTurnToast,
@@ -273,7 +273,10 @@ export default function App() {
     ? <YourTurnToast kind={myTurnInfo.kind} onGo={() => onNav('draft')}/>
     : null;
   const draftBanner = activeTurn && !isMyTurn && !onDraftScreen
-    ? <OnTheClockBanner pickerName={activeTurn.name} onTap={() => onNav('draft')}/>
+    ? <OnTheClockBanner
+        pickerName={activeTurn.name}
+        progress={draftProgressLabel(state)}
+        onTap={() => onNav('draft')}/>
     : null;
 
   // ─── Loading + login gates ──────────────────────────
