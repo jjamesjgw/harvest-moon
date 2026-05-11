@@ -109,6 +109,10 @@ export default function App() {
   // detail view directly. The screen clears it on first read so subsequent
   // navigations don't reopen the same driver.
   const [pendingDriverNum, setPendingDriverNum] = useState(null);
+  // Same pattern for "view another player's team". Set when a PlayerBadge
+  // is tapped anywhere in the app; cleared on Back, on explicit Team-tab
+  // taps, and once TeamScreen consumes it.
+  const [pendingViewingPlayerId, setPendingViewingPlayerId] = useState(null);
 
   const contentRef = useRef(null);
   const lastTurnRef = useRef(null);
@@ -220,6 +224,7 @@ export default function App() {
   const historyRef = useRef([]);
   const goBack = () => {
     setPendingDriverNum(null); // never carry deep-link state across back
+    setPendingViewingPlayerId(null);
     const prev = historyRef.current.pop();
     setScreen(prev || 'home');
   };
@@ -241,6 +246,14 @@ export default function App() {
     if (id === 'back') { goBack(); return; }
     if (payload?.driverNum != null) {
       setPendingDriverNum(payload.driverNum);
+    }
+    if (payload?.playerId != null) {
+      setPendingViewingPlayerId(payload.playerId);
+    }
+    // Explicit Team-tab tap (no payload) always returns to "your team."
+    // Without this, a stale viewing stash could outlast the user's intent.
+    if (id === 'team' && payload?.playerId == null) {
+      setPendingViewingPlayerId(null);
     }
     const target = resolveTarget(id);
     if (target === screen) return; // re-tap same screen — no-op, don't double-stack
