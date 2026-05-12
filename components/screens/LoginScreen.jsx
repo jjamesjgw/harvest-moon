@@ -1,7 +1,6 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
 import { ADMIN_PROFILE, FB, FD, FI, FL, FM, T } from '@/lib/constants';
-import { supabase } from '@/lib/supabase';
 
 // Tile-based login. Six player avatars in a 3×2 grid + a discreet "Admin"
 // link below. Tapping a tile selects that player and reveals the PIN field;
@@ -33,20 +32,24 @@ export default function LoginScreen({ onLogin, players }) {
     return () => clearTimeout(t);
   }, [activeKey]);
 
-  // Verify PIN against the server-side `verify_pin` Postgres function. The
-  // function reads bcrypt-hashed PINs from a table that's locked off from
-  // anon entirely; only this function (SECURITY DEFINER) can read it.
+  // POST to /api/auth/login, which calls verify_pin server-side and, on
+  // success, issues the HttpOnly hm_session cookie that gates /api/league.
   // Returns one of:
-  //   { ok: true }                   — PIN matched
-  //   { ok: false }                  — PIN didn't match (auth failure)
-  //   { ok: false, transport: true } — couldn't reach server (network/outage)
+  //   { ok: true }                   — PIN matched, cookie now set
+  //   { ok: false }                  — PIN rejected (or unknown name)
+  //   { ok: false, transport: true } — couldn't reach the server / RPC blip
   // The transport branch surfaces a distinct user message so people know to
-  // retry instead of staring at "Incorrect PIN" during a Supabase blip.
+  // retry instead of reading "Incorrect PIN" during a Supabase outage.
   const verifyServerSide = async (name, candidatePin) => {
     try {
-      const { data, error } = await supabase.rpc('verify_pin', { p_name: name, p_pin: candidatePin });
-      if (error) return { ok: false, transport: true };
-      return { ok: data === true };
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, pin: candidatePin }),
+      });
+      if (res.ok) return { ok: true };
+      if (res.status === 503) return { ok: false, transport: true };
+      return { ok: false };
     } catch {
       return { ok: false, transport: true };
     }

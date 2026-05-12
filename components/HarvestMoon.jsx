@@ -82,7 +82,7 @@ function migrateState(rawState) {
 export default function App() {
   useGlobalStyles();
 
-  const { state: rawState, setState: setStateRemote, loading, saveStatus, lastError, retry, refresh, refreshing, fetchSucceeded } = useLeague();
+  const { state: rawState, setState: setStateRemote, loading, saveStatus, lastError, sessionExpired, retry, refresh, refreshing, fetchSucceeded } = useLeague();
 
   const [screen, setScreen] = useState('home');
   // Persistent login: rehydrate the last-signed-in player ID from localStorage
@@ -135,12 +135,22 @@ export default function App() {
   // CRITICAL: gated on fetchSucceeded so a transient Supabase fetch failure
   // (which leaves rawState=null but loading=false via either the catch
   // branch or the 3s boot timeout) cannot be mistaken for "no row exists"
-  // and trigger a wipe-write over real league data.
+  // and trigger a wipe-write over real league data. Also gated on meId
+  // because /api/league requires a session cookie — the first signed-in
+  // user creates the row.
   useEffect(() => {
-    if (!loading && !rawState && fetchSucceeded) {
+    if (!loading && !rawState && fetchSucceeded && meId) {
       setStateRemote(makeFreshState(CANONICAL_PLAYERS));
     }
-  }, [loading, rawState, fetchSucceeded, setStateRemote]);
+  }, [loading, rawState, fetchSucceeded, meId, setStateRemote]);
+
+  // Session-expired routing. When /api/league returns 401, useLeague flips
+  // sessionExpired. Drop the persisted meId so LoginScreen re-shows — the
+  // PIN prompt is the only way to get a fresh cookie.
+  useEffect(() => {
+    if (sessionExpired && meId) setMeId(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionExpired]);
 
   // Scroll back to top whenever we change screens.
   useEffect(() => {
@@ -392,7 +402,10 @@ export default function App() {
     standings:       <StandingsScreen     state={state} me={me} onNav={onNav}/>,
     team:            <TeamScreen          state={state} me={me} viewingPlayerId={pendingViewingPlayerId} onNav={onNav}/>,
     recap:           <RecapScreen         state={state} onNav={onNav} viewWk={pendingRecapWk} onConsumeViewWk={() => setPendingRecapWk(null)}/>,
-    more:            <MoreScreen          state={state} me={me} onNav={onNav} onReset={resetSeason} onSignOut={() => setMeId(null)}/>,
+    more:            <MoreScreen          state={state} me={me} onNav={onNav} onReset={resetSeason} onSignOut={async () => {
+      try { await fetch('/api/auth/logout', { method: 'POST' }); } catch {}
+      setMeId(null);
+    }}/>,
     profile:         <ProfileScreen       state={state} setState={setState} me={me} saveStatus={saveStatus} onBack={() => onNav('back')}/>,
     schedule:        <ScheduleScreen      state={state} onNav={onNav} onBack={() => onNav('back')}/>,
     history:         <HistoryScreen       state={state} me={me} onBack={() => onNav('back')} onNav={onNav} onEdit={(wk) => { setEditingWeek(wk); onNav('edit-results'); }}/>,
