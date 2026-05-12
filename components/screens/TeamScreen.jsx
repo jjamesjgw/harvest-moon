@@ -1,6 +1,6 @@
 'use client';
 import React, { useMemo, useState } from 'react';
-import { BackChip, CarNum, DriverRow, SectionLabel, TopBar } from '@/components/ui/primitives';
+import { BackChip, CarNum, DriverRow, LinkArrow, SectionLabel, TopBar } from '@/components/ui/primitives';
 import { FB, FD, FI, FL, SERIES, T } from '@/lib/constants';
 import { DEFAULT_DRIVERS } from '@/lib/data';
 import { getWeekConfig, resolvePickDriver } from '@/lib/utils';
@@ -17,13 +17,29 @@ function SeriesTag({ series }) {
   }}>{meta.short}</span>;
 }
 
-export default function TeamScreen({ state, me, onNav }) {
-  const { currentWeek, draftState, draftHistory = [], weeklyResults = [] } = state;
+export default function TeamScreen({ state, me, viewingPlayerId, onConsumeViewingPlayer, onNav }) {
+  const { currentWeek, players, draftState, draftHistory = [], weeklyResults = [] } = state;
   const cfg = getWeekConfig(state, currentWeek);
+
+  // The "subject" is whose team we're rendering. Falls back to me when no
+  // viewing prop is set. The component used to be hard-bound to me; we keep
+  // every downstream filter referencing subject so flipping the prop alone
+  // changes the view.
+  const subject = (viewingPlayerId && viewingPlayerId !== me.id)
+    ? (players.find(p => p.id === viewingPlayerId) || me)
+    : me;
+  const viewingOther = subject.id !== me.id;
+
+  // Consume the stash on first read so back/forward navigation can't
+  // accidentally re-open the same player's view.
+  React.useEffect(() => {
+    if (viewingPlayerId) onConsumeViewingPlayer?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewingPlayerId]);
 
   // Current-week roster — group picks by series so bonus drivers render in
   // their own labeled sections rather than mingled with the Cup picks.
-  const myPicks = (draftState?.picks || []).filter(p => p.playerId === me.id);
+  const myPicks = (draftState?.picks || []).filter(p => p.playerId === subject.id);
   const myCupDrivers = useMemo(() => {
     const wkExtras = (state.weekDriversExtra || {})[currentWeek] || [];
     return [...DEFAULT_DRIVERS, ...wkExtras];
@@ -52,13 +68,20 @@ export default function TeamScreen({ state, me, onNav }) {
     .map(h => ({
       wk: h.wk,
       track: h.track,
-      picks: h.picks.filter(p => p.playerId === me.id),
+      picks: h.picks.filter(p => p.playerId === subject.id),
     }));
 
   const [expanded, setExpanded] = useState(null);
 
   return <div style={{ paddingBottom:20 }}>
-    <TopBar subtitle={`${me.name} · Week ${String(currentWeek).padStart(2,'0')}`} title="My Team" right={<BackChip onClick={() => onNav('home')}/>}/>
+    <TopBar
+      subtitle={`${subject.name} · Week ${String(currentWeek).padStart(2,'0')}`}
+      title={viewingOther ? `${subject.name}'s Team` : 'My Team'}
+      right={viewingOther
+        ? <LinkArrow onClick={() => onNav('team')}>My Team</LinkArrow>
+        : <BackChip onClick={() => onNav('home')}/>
+      }
+    />
 
     <SectionLabel right={cfg.bonusSeries.length > 0
       ? <span style={{ fontFamily: FI, fontStyle:'italic', fontSize:11, textTransform:'none', letterSpacing:'0.01em', color: T.mute }}>{totalPicked}/{cfg.totalPicks}</span>
@@ -108,7 +131,7 @@ export default function TeamScreen({ state, me, onNav }) {
       <div style={{ padding:'14px 20px 20px' }}>
         {pastRosters.map((r, idx) => {
           const wkResult = weeklyResults.find(w => w.wk === r.wk);
-          const pts = wkResult?.pts[me.id];
+          const pts = wkResult?.pts[subject.id];
           const isExp = expanded === r.wk;
           const lastIdx = idx === pastRosters.length - 1;
           return <div key={r.wk} style={{ borderBottom: lastIdx ? 'none' : `0.5px solid ${T.line2}` }}>

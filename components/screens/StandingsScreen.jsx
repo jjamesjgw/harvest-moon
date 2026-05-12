@@ -139,7 +139,7 @@ export default function StandingsScreen({ state, me, onNav }) {
           display:'flex', alignItems:'center', gap:14,
         }}>
           <div style={{ fontFamily: FD, fontSize:20, fontWeight:600, width:26, color: T.ink, lineHeight:1, fontVariantNumeric:'tabular-nums' }}>{String(i+1).padStart(2,'0')}</div>
-          <PlayerBadge player={p} size={26}/>
+          <PlayerBadge player={p} size={26} onClick={() => onNav('team', { playerId: p.id })}/>
           <div style={{ flex:1, minWidth:0 }}>
             <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
               <span style={{ fontFamily: FD, fontSize:20, fontWeight:600, letterSpacing:'-0.03em', lineHeight:1 }}>{p.name}</span>
@@ -179,6 +179,7 @@ export default function StandingsScreen({ state, me, onNav }) {
           completedWeeks={completedWeeks}
           sorted={sorted}
           me={me}
+          onNav={onNav}
         />
       </div>
     </>}
@@ -194,7 +195,7 @@ export default function StandingsScreen({ state, me, onNav }) {
 // toggles two booleans (hasMoreLeft / hasMoreRight). The pip points in
 // the direction the user can still scroll, mirroring how iOS surfaces
 // scrollable areas in apps like Photos.
-function ScrollableWeekTable({ completedWeeks, sorted, me }) {
+function ScrollableWeekTable({ completedWeeks, sorted, me, onNav }) {
   const scrollRef = useRef(null);
   const [hasMoreLeft, setHasMoreLeft] = useState(false);
   const [hasMoreRight, setHasMoreRight] = useState(false);
@@ -262,7 +263,7 @@ function ScrollableWeekTable({ completedWeeks, sorted, me }) {
             padding:'10px 6px', display:'flex', alignItems:'center', gap:6,
             position:'sticky', left:0, background: rowBg,
           }}>
-            <PlayerBadge player={p} size={18}/>
+            <PlayerBadge player={p} size={18} onClick={() => onNav('team', { playerId: p.id })}/>
             <span style={{ fontFamily: FD, fontSize:14, fontWeight:600, letterSpacing:'-0.03em' }}>{p.name.slice(0,4)}</span>
           </div>
           {completedWeeks.map(w => {

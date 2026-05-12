@@ -233,6 +233,7 @@ export default function DraftScreen({ state, setState, me, onNav }) {
           totalRounds={cfg.totalPicks}
           myTurn={myTurn}
           done={done}
+          onNav={onNav}
         />
       </div>
 
@@ -245,6 +246,7 @@ export default function DraftScreen({ state, setState, me, onNav }) {
         players={players}
         freshPickKeys={freshPickKeys}
         lookupDriver={lookupDriver}
+        onNav={onNav}
       />}
 
       {showSeriesTabs && <SeriesTabs
@@ -295,6 +297,7 @@ export default function DraftScreen({ state, setState, me, onNav }) {
       onAddDriver={() => onNav('manage-drivers')}
       driverStats={driverStats}
       freshPickKeys={freshPickKeys}
+      onNav={onNav}
     />}
 
     {!done && mode === 'board' && <DraftBoard
@@ -306,6 +309,7 @@ export default function DraftScreen({ state, setState, me, onNav }) {
       currentPickIdx={pickIdx}
       freshPickKeys={freshPickKeys}
       lookupDriver={lookupDriver}
+      onNav={onNav}
     />}
 
     {!done && mode === 'pick' && activeSeries === 'Cup' && isAdmin && <div style={{ padding:'0 20px 24px' }}>
@@ -329,7 +333,7 @@ export default function DraftScreen({ state, setState, me, onNav }) {
 }
 
 // ── Header banner: who's on the clock + pick count ─────────────────
-function OnTheClock({ currentPicker, pickIdx, totalPicks, round, totalRounds, myTurn, done }) {
+function OnTheClock({ currentPicker, pickIdx, totalPicks, round, totalRounds, myTurn, done, onNav }) {
   if (done) return <div style={{ background: T.good, color:'#fff', borderRadius:4, padding:'16px 18px' }}>
     <div style={{ fontFamily: FL, fontSize:9, fontWeight:500, letterSpacing:'0.24em', textTransform:'uppercase', color:'rgba(255,255,255,0.75)' }}>Draft Complete</div>
     <div style={{ fontFamily: FD, fontSize:24, fontWeight:600, letterSpacing:'-0.03em', marginTop:2 }}>Roll out the green flag</div>
@@ -340,7 +344,7 @@ function OnTheClock({ currentPicker, pickIdx, totalPicks, round, totalRounds, my
     display:'flex', alignItems:'center', gap:14,
     border: myTurn ? `2px solid ${T.hot}` : 'none',
   }}>
-    <PlayerBadge player={currentPicker} size={36}/>
+    <PlayerBadge player={currentPicker} size={36} onClick={() => onNav('team', { playerId: currentPicker.id })}/>
     <div style={{ flex:1, minWidth:0 }}>
       <div style={{ fontFamily: FL, fontSize:9, fontWeight:500, letterSpacing:'0.24em', textTransform:'uppercase', color: myTurn ? T.hot : 'rgba(247,244,237,0.5)' }}>
         {myTurn ? "You're up" : 'On the Clock'} · Round {round}/{totalRounds}
@@ -406,7 +410,7 @@ function ModeToggle({ mode, onChange }) {
 // older ones down — so only the new top row is "new", the others slide
 // without remounting. Bonus picks include a small series tag on the right
 // so the source pool is visible without having to think about it.
-function LatestPicksStrip({ picks, players, freshPickKeys, lookupDriver }) {
+function LatestPicksStrip({ picks, players, freshPickKeys, lookupDriver, onNav }) {
   if (picks.length === 0) return null;
   const recent = picks.slice(-3).reverse();
   const total = picks.length;
@@ -440,7 +444,7 @@ function LatestPicksStrip({ picks, players, freshPickKeys, lookupDriver }) {
             }}>
               {String(overallNum).padStart(2, '0')}
             </span>
-            {player && <PlayerBadge player={player} size={18}/>}
+            {player && <PlayerBadge player={player} size={18} onClick={() => onNav('team', { playerId: player.id })}/>}
             <span style={{
               fontFamily: FD, fontSize: 12, fontWeight: 600,
               letterSpacing: '-0.02em',
@@ -530,7 +534,7 @@ function SeriesTabs({ cfg, picks, pickerId, active, onSelect, bonusPools }) {
 }
 
 // ── Driver pool grid ───────────────────────────────────────────────
-function DraftGrid({ drivers, pickedKeys, activeSeries, draftState, players, onPick, remaining, isEmpty, isAdmin, onAddDriver, driverStats, freshPickKeys }) {
+function DraftGrid({ drivers, pickedKeys, activeSeries, draftState, players, onPick, remaining, isEmpty, isAdmin, onAddDriver, driverStats, freshPickKeys, onNav }) {
   if (isEmpty) {
     const meta = SERIES[activeSeries] || { label: activeSeries };
     return <div style={{ padding:'24px 20px' }}>
@@ -615,7 +619,7 @@ function DraftGrid({ drivers, pickedKeys, activeSeries, draftState, players, onP
               // After the 400ms run completes it stays in place.
               animation: isFresh ? 'hm-tagslide 400ms cubic-bezier(0.32,0.72,0,1) both' : 'none',
             }}>{takenPl.name.slice(0,3)}</div>}
-            <CarNum driver={d} size={48}/>
+            <CarNum driver={d} size={48} onClick={activeSeries === 'Cup' ? () => onNav('drivers', { driverNum: d.num }) : undefined}/>
             <div style={{
               fontFamily: FD, fontSize:13, fontWeight:600,
               lineHeight:1.1, letterSpacing:'-0.02em',
@@ -671,7 +675,7 @@ function DraftGrid({ drivers, pickedKeys, activeSeries, draftState, players, onP
 // picks ride the same hm-pickring animation used in the grid for visual
 // consistency. Round labels include a snake direction arrow so the
 // chronological flow is obvious at a glance.
-function DraftBoard({ snakeOrder, picks, players, slotAssign, totalRounds, currentPickIdx, freshPickKeys, lookupDriver }) {
+function DraftBoard({ snakeOrder, picks, players, slotAssign, totalRounds, currentPickIdx, freshPickKeys, lookupDriver, onNav }) {
   const numPlayers = players.length;
 
   // (round, slot) → overall pick index. Lets us look up "what's at row 3,
@@ -718,7 +722,7 @@ function DraftBoard({ snakeOrder, picks, players, slotAssign, totalRounds, curre
             padding: '4px 0',
             minWidth: 0,
           }}>
-            {p ? <PlayerBadge player={p} size={20}/> : <div style={{ width: 20, height: 20 }}/>}
+            {p ? <PlayerBadge player={p} size={20} onClick={() => onNav('team', { playerId: p.id })}/> : <div style={{ width: 20, height: 20 }}/>}
             <div style={{
               fontFamily: FL, fontSize: 7, fontWeight: 700,
               letterSpacing: '0.14em', textTransform: 'uppercase',
@@ -788,7 +792,7 @@ function DraftBoard({ snakeOrder, picks, players, slotAssign, totalRounds, curre
                 }}>
                   {filled ? (
                     driver ? <>
-                      <CarNum driver={driver} size={22}/>
+                      <CarNum driver={driver} size={22} onClick={series === 'Cup' ? () => onNav('drivers', { driverNum: driver.num }) : undefined}/>
                       <div style={{
                         fontFamily: FD, fontSize: 9, fontWeight: 600,
                         letterSpacing: '-0.02em',
@@ -877,7 +881,7 @@ function DraftComplete({ state, onNav, cupDrivers }) {
           borderBottom: i === players.length-1 ? 'none' : `0.5px solid ${T.line2}`,
         }}>
           <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
-            <PlayerBadge player={p} size={22}/>
+            <PlayerBadge player={p} size={22} onClick={() => onNav('team', { playerId: p.id })}/>
             <span style={{ fontFamily: FD, fontSize:18, fontWeight:600, letterSpacing:'-0.03em' }}>{p.name}</span>
           </div>
           {Object.keys(cfg.allotments).map(series => {
@@ -894,7 +898,7 @@ function DraftComplete({ state, onNav, cupDrivers }) {
                 {seriesPicks.map(pk => {
                   const d = lookupDriver(series, pk.driverNum);
                   return d
-                    ? <CarNum key={`${series}:${pk.driverNum}`} driver={d} size={32}/>
+                    ? <CarNum key={`${series}:${pk.driverNum}`} driver={d} size={32} onClick={series === 'Cup' ? () => onNav('drivers', { driverNum: d.num }) : undefined}/>
                     : <div key={`${series}:${pk.driverNum}`} style={{
                         width:32, height:32, borderRadius:4,
                         background: T.bg2, color: T.mute,

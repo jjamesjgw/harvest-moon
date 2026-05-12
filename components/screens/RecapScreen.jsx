@@ -17,8 +17,16 @@ function SeriesTag({ series }) {
   }}>{meta.short}</span>;
 }
 
-export default function RecapScreen({ state, onNav }) {
+export default function RecapScreen({ state, onNav, viewWk, onConsumeViewWk }) {
   const { players, weeklyResults, draftHistory = [] } = state;
+
+  // Consume the deep-link stash on mount so back/forward navigation can't
+  // accidentally re-open the same week.
+  React.useEffect(() => {
+    if (viewWk != null) onConsumeViewWk?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewWk]);
+
   if (weeklyResults.length === 0) {
     return <div style={{ paddingBottom:20 }}>
       <TopBar title="Race Recap" right={<BackChip onClick={() => onNav('more')}/>}/>
@@ -29,7 +37,11 @@ export default function RecapScreen({ state, onNav }) {
       </div>
     </div>;
   }
-  const last = weeklyResults.sort((a,b) => b.wk - a.wk)[0];
+
+  // viewWk lets Home (or any caller) deep-link to a specific finalized
+  // week. Falls back to the most-recent finalized week when null.
+  const explicit = viewWk != null ? weeklyResults.find(w => w.wk === viewWk) : null;
+  const last = explicit || weeklyResults.slice().sort((a,b) => b.wk - a.wk)[0];
   const sortedRes = players.map(p => ({ ...p, pts: last.pts[p.id] || 0 })).sort((a,b) => b.pts - a.pts);
   const hist = draftHistory.find(h => h.wk === last.wk);
   const raceMeta = (state.schedule || []).find(s => s.wk === last.wk);
@@ -136,7 +148,7 @@ export default function RecapScreen({ state, onNav }) {
           borderBottom: i === sortedRes.length-1 ? 'none' : `0.5px solid ${T.line2}`,
         }}>
           <div style={{ fontFamily: FD, fontSize:18, fontWeight:600, width:22, color: i === 0 ? T.hot : T.ink, fontVariantNumeric:'tabular-nums' }}>{String(i+1).padStart(2,'0')}</div>
-          <PlayerBadge player={p} size={24}/>
+          <PlayerBadge player={p} size={24} onClick={() => onNav('team', { playerId: p.id })}/>
           <div style={{ flex:1, fontFamily: FD, fontSize:18, fontWeight:600, letterSpacing:'-0.03em' }}>{p.name}</div>
           <div style={{ fontFamily: FB, fontSize:15, fontWeight: i === 0 ? 600 : 500, fontVariantNumeric:'tabular-nums', color: i === 0 ? T.hot : T.ink }}>{p.pts}</div>
         </div>
@@ -155,7 +167,7 @@ export default function RecapScreen({ state, onNav }) {
               borderBottom: i === arr.length-1 ? 'none' : `0.5px solid ${T.line2}`,
             }}>
               <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
-                <PlayerBadge player={p} size={20}/>
+                <PlayerBadge player={p} size={20} onClick={() => onNav('team', { playerId: p.id })}/>
                 <span style={{ fontFamily: FD, fontSize:16, fontWeight:600, letterSpacing:'-0.03em' }}>{p.name}</span>
                 <span style={{ marginLeft:'auto', fontFamily: FB, fontSize:14, fontWeight:500, fontVariantNumeric:'tabular-nums' }}>{last.pts[p.id] || 0} pts</span>
               </div>

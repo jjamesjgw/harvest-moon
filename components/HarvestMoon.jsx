@@ -8,7 +8,7 @@ import {
 } from '@/lib/constants';
 import { DEFAULT_DRIVERS, DEFAULT_SCHEDULE } from '@/lib/data';
 import {
-  buildSlotPickOrder, buildSnakeOrder, computeStandings, detectActiveTurn, getWeekConfig, makeFreshState,
+  buildSlotPickOrder, buildSnakeOrder, computeStandings, detectActiveTurn, getWeekConfig, makeFreshState, draftProgressLabel,
 } from '@/lib/utils';
 import {
   AppFrame, TabBar, OnTheClockBanner, PullToRefresh, SaveBanner, YourTurnToast,
@@ -109,6 +109,14 @@ export default function App() {
   // detail view directly. The screen clears it on first read so subsequent
   // navigations don't reopen the same driver.
   const [pendingDriverNum, setPendingDriverNum] = useState(null);
+  // Same pattern for "view another player's team". Set when a PlayerBadge
+  // is tapped anywhere in the app; cleared on Back, on explicit Team-tab
+  // taps, and once TeamScreen consumes it.
+  const [pendingViewingPlayerId, setPendingViewingPlayerId] = useState(null);
+  // Deep-link target for RecapScreen when navigated via Home's Last Race
+  // strip or similar entry points. Defaults to "latest finalized week"
+  // when null. Same consume-on-mount pattern as the driver / player stashes.
+  const [pendingRecapWk, setPendingRecapWk] = useState(null);
 
   const contentRef = useRef(null);
   const lastTurnRef = useRef(null);
@@ -220,6 +228,8 @@ export default function App() {
   const historyRef = useRef([]);
   const goBack = () => {
     setPendingDriverNum(null); // never carry deep-link state across back
+    setPendingViewingPlayerId(null);
+    setPendingRecapWk(null);
     const prev = historyRef.current.pop();
     setScreen(prev || 'home');
   };
@@ -241,6 +251,17 @@ export default function App() {
     if (id === 'back') { goBack(); return; }
     if (payload?.driverNum != null) {
       setPendingDriverNum(payload.driverNum);
+    }
+    if (payload?.playerId != null) {
+      setPendingViewingPlayerId(payload.playerId);
+    }
+    if (payload?.wk != null) {
+      setPendingRecapWk(payload.wk);
+    }
+    // Explicit Team-tab tap (no payload) always returns to "your team."
+    // Without this, a stale viewing stash could outlast the user's intent.
+    if (id === 'team' && payload?.playerId == null) {
+      setPendingViewingPlayerId(null);
     }
     const target = resolveTarget(id);
     if (target === screen) return; // re-tap same screen — no-op, don't double-stack
@@ -270,10 +291,16 @@ export default function App() {
   // turn information natively (slot, draft).
   const onDraftScreen = screen === 'slot' || screen === 'draft';
   const turnToast = myTurnInfo && !onDraftScreen
-    ? <YourTurnToast kind={myTurnInfo.kind} onGo={() => onNav('draft')}/>
+    ? <YourTurnToast
+        kind={myTurnInfo.kind}
+        progress={draftProgressLabel(state)}
+        onGo={() => onNav('draft')}/>
     : null;
   const draftBanner = activeTurn && !isMyTurn && !onDraftScreen
-    ? <OnTheClockBanner pickerName={activeTurn.name} onTap={() => onNav('draft')}/>
+    ? <OnTheClockBanner
+        pickerName={activeTurn.name}
+        progress={draftProgressLabel(state)}
+        onTap={() => onNav('draft')}/>
     : null;
 
   // ─── Loading + login gates ──────────────────────────
@@ -362,8 +389,8 @@ export default function App() {
     'enter-results': <EnterResultsScreen  state={state} setState={setState} me={me} onNav={onNav}/>,
     'edit-results':  <EnterResultsScreen  state={state} setState={setState} me={me} onNav={(id, p) => { if (id === 'back') setEditingWeek(null); onNav(id, p); }} editWeek={editingWeek}/>,
     standings:       <StandingsScreen     state={state} me={me} onNav={onNav}/>,
-    team:            <TeamScreen          state={state} me={me} onNav={onNav}/>,
-    recap:           <RecapScreen         state={state} onNav={onNav}/>,
+    team:            <TeamScreen          state={state} me={me} viewingPlayerId={pendingViewingPlayerId} onConsumeViewingPlayer={() => setPendingViewingPlayerId(null)} onNav={onNav}/>,
+    recap:           <RecapScreen         state={state} onNav={onNav} viewWk={pendingRecapWk} onConsumeViewWk={() => setPendingRecapWk(null)}/>,
     more:            <MoreScreen          state={state} me={me} onNav={onNav} onReset={resetSeason} onSignOut={() => setMeId(null)}/>,
     profile:         <ProfileScreen       state={state} setState={setState} me={me} saveStatus={saveStatus} onBack={() => onNav('back')}/>,
     schedule:        <ScheduleScreen      state={state} onNav={onNav} onBack={() => onNav('back')}/>,

@@ -35,14 +35,22 @@ export function CarNum({ driver, size = 38, onClick }) {
   return <div style={baseStyle}>{driver.num}</div>;
 }
 
-export function PlayerBadge({ player, size = 22, style = {} }) {
-  return <div style={{
+export function PlayerBadge({ player, size = 22, style = {}, onClick }) {
+  const baseStyle = {
     width:size, height:size, borderRadius:'50%',
     background: player.color, color:'#fff',
     display:'inline-flex', alignItems:'center', justifyContent:'center',
     fontFamily: FL, fontWeight:600, fontSize: size * 0.45,
     lineHeight:1, flexShrink:0, ...style,
-  }}>{player.initial || player.name[0].toUpperCase()}</div>;
+  };
+  if (onClick) {
+    return <button
+      onClick={(e) => { e.stopPropagation(); onClick(player); }}
+      style={{ ...baseStyle, appearance:'none', padding:0, cursor:'pointer', border:'none' }}
+      aria-label={`Open ${player.name}'s team`}
+    >{player.initial || player.name[0].toUpperCase()}</button>;
+  }
+  return <div style={baseStyle}>{player.initial || player.name[0].toUpperCase()}</div>;
 }
 
 export function SectionLabel({ children, right, style = {} }) {
@@ -397,7 +405,7 @@ export function JustPickedToast({ player, driver, onTap, onDismiss }) {
   </button>;
 }
 
-export function YourTurnToast({ kind, onGo }) {
+export function YourTurnToast({ kind, progress, onGo }) {
   return <button onClick={onGo} style={{
     appearance:'none', display:'flex', alignItems:'center', gap:12,
     background:'linear-gradient(180deg, #C9A268 0%, #B8935A 50%, #9A7A48 100%)',
@@ -416,6 +424,18 @@ export function YourTurnToast({ kind, onGo }) {
         {kind === 'slot' ? 'Pick your draft slot →' : 'Make your driver pick →'}
       </div>
     </div>
+    {progress && <div style={{ textAlign:'right', flexShrink:0, marginLeft:8 }}>
+      <div style={{
+        fontFamily: FL, fontSize:9, fontWeight:600,
+        letterSpacing:'0.22em', textTransform:'uppercase',
+        color:'rgba(20,17,13,0.55)',
+      }}>{progress.label}</div>
+      <div style={{
+        fontFamily: FB, fontSize:12, fontWeight:600,
+        color: T.ink, marginTop:1,
+        fontVariantNumeric:'tabular-nums',
+      }}>{progress.value}</div>
+    </div>}
   </button>;
 }
 
@@ -597,7 +617,7 @@ export function WinsCount({ wins, compact = false, style = {} }) {
   </span>;
 }
 
-export function OnTheClockBanner({ pickerName, onTap }) {
+export function OnTheClockBanner({ pickerName, progress, onTap }) {
   if (!pickerName) return null;
   return <button onClick={onTap} style={{
     appearance:'none', display:'flex', alignItems:'center', gap:10,
@@ -621,6 +641,18 @@ export function OnTheClockBanner({ pickerName, onTap }) {
         whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis',
       }}>{pickerName} is on the clock</div>
     </div>
+    {progress && <div style={{ textAlign:'right', flexShrink:0, marginRight:8 }}>
+      <div style={{
+        fontFamily: FL, fontSize:9, fontWeight:600,
+        letterSpacing:'0.22em', textTransform:'uppercase',
+        color:'rgba(247,244,237,0.55)',
+      }}>{progress.label}</div>
+      <div style={{
+        fontFamily: FB, fontSize:11, fontWeight:600,
+        color:'rgba(247,244,237,0.85)', marginTop:1,
+        fontVariantNumeric:'tabular-nums',
+      }}>{progress.value}</div>
+    </div>}
     <span style={{
       fontFamily: FL, fontSize:9, fontWeight:600,
       letterSpacing:'0.22em', textTransform:'uppercase',
