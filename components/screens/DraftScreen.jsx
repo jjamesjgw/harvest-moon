@@ -619,7 +619,17 @@ function DraftGrid({ drivers, pickedKeys, activeSeries, draftState, players, onP
               // After the 400ms run completes it stays in place.
               animation: isFresh ? 'hm-tagslide 400ms cubic-bezier(0.32,0.72,0,1) both' : 'none',
             }}>{takenPl.name.slice(0,3)}</div>}
-            <CarNum driver={d} size={48} onClick={activeSeries === 'Cup' ? () => onNav('drivers', { driverNum: d.num }) : undefined}/>
+            {/* Outer card is a <button> for picking; CarNum's onClick form
+                would render button-in-button. Wrap the chip in a non-tabbable
+                span so the stats tap target stays valid HTML. */}
+            {activeSeries === 'Cup' ? (
+              <span
+                onClick={(e) => { e.stopPropagation(); onNav('drivers', { driverNum: d.num }); }}
+                style={{ display:'inline-flex', cursor:'pointer' }}
+              ><CarNum driver={d} size={48}/></span>
+            ) : (
+              <CarNum driver={d} size={48}/>
+            )}
             <div style={{
               fontFamily: FD, fontSize:13, fontWeight:600,
               lineHeight:1.1, letterSpacing:'-0.02em',
