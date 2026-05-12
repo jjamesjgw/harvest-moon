@@ -1,6 +1,6 @@
 'use client';
 import React from 'react';
-import { CarNum, LinkArrow, PlayerBadge, RaceCountdown, SectionLabel, TopBar } from '@/components/ui/primitives';
+import { CarNum, LinkArrow, RaceCountdown, SectionLabel, TopBar } from '@/components/ui/primitives';
 import { InstallHint } from '@/components/ui/InstallHint';
 import { ADMIN_ID, FB, FD, FI, FL, T } from '@/lib/constants';
 import { computeAllDriverStats, computeStandings, getWeekConfig, ordinalSuffix, raceCountdown } from '@/lib/utils';
@@ -27,7 +27,7 @@ function StatOfTheSeason({ state, onNav }) {
   }
   if (!driver) return null;
   return <>
-    <SectionLabel right={<LinkArrow onClick={() => onNav('drivers')}>All →</LinkArrow>}>
+    <SectionLabel right={<LinkArrow onClick={() => onNav('drivers')}>All</LinkArrow>}>
       Stat of the Season · {slot.label}
     </SectionLabel>
     <div style={{ padding:'14px 20px 20px' }}>
@@ -75,7 +75,7 @@ function YourRosterStrip({ state, me, onNav }) {
   const myWkPts = wkResult?.pts?.[me.id];
 
   return <>
-    <SectionLabel right={<LinkArrow onClick={() => onNav('team')}>View →</LinkArrow>}>
+    <SectionLabel right={<LinkArrow onClick={() => onNav('team')}>View</LinkArrow>}>
       Your Roster · Wk {String(currentWeek).padStart(2,'0')}
     </SectionLabel>
     <div style={{ padding:'14px 20px 20px' }}>
@@ -143,7 +143,7 @@ function LastRaceStrip({ state, me, onNav }) {
     : `You: ${myRank}${ord} (${myPts}) · ${winnerName} won the week (${topPts})`;
 
   return <>
-    <SectionLabel right={<LinkArrow onClick={() => onNav('recap', { wk: prevWk })}>Recap →</LinkArrow>}>
+    <SectionLabel right={<LinkArrow onClick={() => onNav('recap', { wk: prevWk })}>Recap</LinkArrow>}>
       Last Race
     </SectionLabel>
     <div style={{ padding:'14px 20px 20px' }}>
@@ -365,12 +365,6 @@ export default function HomeScreen({ state, me, onNav }) {
       </div>
     </div>
 
-    <StatOfTheSeason state={state} onNav={onNav}/>
-
-    <YourRosterStrip state={state} me={me} onNav={onNav}/>
-
-    <LastRaceStrip state={state} me={me} onNav={onNav}/>
-
     {/* Your standing */}
     <div style={{ padding:'0 20px 20px' }}>
       <div style={{
@@ -393,9 +387,15 @@ export default function HomeScreen({ state, me, onNav }) {
       </div>
     </div>
 
+    <StatOfTheSeason state={state} onNav={onNav}/>
+
+    <YourRosterStrip state={state} me={me} onNav={onNav}/>
+
+    <LastRaceStrip state={state} me={me} onNav={onNav}/>
+
     {/* Upcoming */}
     {upcoming.length > 0 && <>
-      <SectionLabel right={<LinkArrow onClick={() => onNav('schedule')}>All →</LinkArrow>}>Upcoming</SectionLabel>
+      <SectionLabel right={<LinkArrow onClick={() => onNav('schedule')}>All</LinkArrow>}>Upcoming</SectionLabel>
       <div style={{ padding:'14px 20px 20px' }}>
         {upcoming.map((race, i, arr) => (
           <div key={race.wk} style={{

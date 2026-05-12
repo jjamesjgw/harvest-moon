@@ -78,7 +78,7 @@ export default function TeamScreen({ state, me, viewingPlayerId, onConsumeViewin
       subtitle={`${subject.name} · Week ${String(currentWeek).padStart(2,'0')}`}
       title={viewingOther ? `${subject.name}'s Team` : 'My Team'}
       right={viewingOther
-        ? <LinkArrow onClick={() => onNav('team')}>My Team →</LinkArrow>
+        ? <LinkArrow onClick={() => onNav('team')}>My Team</LinkArrow>
         : <BackChip onClick={() => onNav('home')}/>
       }
     />

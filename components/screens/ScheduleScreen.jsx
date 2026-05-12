@@ -273,7 +273,7 @@ function RaceDetail({ race, state, onBack, onNav }) {
               <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:12, color: T.mute }}>{count}/player · {pool.length} in pool</div>
             </div>
             {pool.length > 0 ? <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginTop:8 }}>
-              {pool.map(d => <CarNum key={d.num} driver={d} size={26} onClick={series === 'Cup' ? () => onNav('drivers', { driverNum: d.num }) : undefined}/>)}
+              {pool.map(d => <CarNum key={d.num} driver={d} size={26}/>)}
             </div> : <div style={{
               fontFamily: FI, fontStyle:'italic', fontSize:12, color: T.mute, marginTop:6,
             }}>Admin hasn't built this pool yet.</div>}
