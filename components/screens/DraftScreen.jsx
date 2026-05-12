@@ -233,6 +233,7 @@ export default function DraftScreen({ state, setState, me, onNav }) {
           totalRounds={cfg.totalPicks}
           myTurn={myTurn}
           done={done}
+          onNav={onNav}
         />
       </div>
 
@@ -245,6 +246,7 @@ export default function DraftScreen({ state, setState, me, onNav }) {
         players={players}
         freshPickKeys={freshPickKeys}
         lookupDriver={lookupDriver}
+        onNav={onNav}
       />}
 
       {showSeriesTabs && <SeriesTabs
@@ -331,7 +333,7 @@ export default function DraftScreen({ state, setState, me, onNav }) {
 }
 
 // ── Header banner: who's on the clock + pick count ─────────────────
-function OnTheClock({ currentPicker, pickIdx, totalPicks, round, totalRounds, myTurn, done }) {
+function OnTheClock({ currentPicker, pickIdx, totalPicks, round, totalRounds, myTurn, done, onNav }) {
   if (done) return <div style={{ background: T.good, color:'#fff', borderRadius:4, padding:'16px 18px' }}>
     <div style={{ fontFamily: FL, fontSize:9, fontWeight:500, letterSpacing:'0.24em', textTransform:'uppercase', color:'rgba(255,255,255,0.75)' }}>Draft Complete</div>
     <div style={{ fontFamily: FD, fontSize:24, fontWeight:600, letterSpacing:'-0.03em', marginTop:2 }}>Roll out the green flag</div>
@@ -342,7 +344,7 @@ function OnTheClock({ currentPicker, pickIdx, totalPicks, round, totalRounds, my
     display:'flex', alignItems:'center', gap:14,
     border: myTurn ? `2px solid ${T.hot}` : 'none',
   }}>
-    <PlayerBadge player={currentPicker} size={36}/>
+    <PlayerBadge player={currentPicker} size={36} onClick={() => onNav('team', { playerId: currentPicker.id })}/>
     <div style={{ flex:1, minWidth:0 }}>
       <div style={{ fontFamily: FL, fontSize:9, fontWeight:500, letterSpacing:'0.24em', textTransform:'uppercase', color: myTurn ? T.hot : 'rgba(247,244,237,0.5)' }}>
         {myTurn ? "You're up" : 'On the Clock'} · Round {round}/{totalRounds}
@@ -408,7 +410,7 @@ function ModeToggle({ mode, onChange }) {
 // older ones down — so only the new top row is "new", the others slide
 // without remounting. Bonus picks include a small series tag on the right
 // so the source pool is visible without having to think about it.
-function LatestPicksStrip({ picks, players, freshPickKeys, lookupDriver }) {
+function LatestPicksStrip({ picks, players, freshPickKeys, lookupDriver, onNav }) {
   if (picks.length === 0) return null;
   const recent = picks.slice(-3).reverse();
   const total = picks.length;
@@ -442,7 +444,7 @@ function LatestPicksStrip({ picks, players, freshPickKeys, lookupDriver }) {
             }}>
               {String(overallNum).padStart(2, '0')}
             </span>
-            {player && <PlayerBadge player={player} size={18}/>}
+            {player && <PlayerBadge player={player} size={18} onClick={() => onNav('team', { playerId: player.id })}/>}
             <span style={{
               fontFamily: FD, fontSize: 12, fontWeight: 600,
               letterSpacing: '-0.02em',
@@ -720,7 +722,7 @@ function DraftBoard({ snakeOrder, picks, players, slotAssign, totalRounds, curre
             padding: '4px 0',
             minWidth: 0,
           }}>
-            {p ? <PlayerBadge player={p} size={20}/> : <div style={{ width: 20, height: 20 }}/>}
+            {p ? <PlayerBadge player={p} size={20} onClick={() => onNav('team', { playerId: p.id })}/> : <div style={{ width: 20, height: 20 }}/>}
             <div style={{
               fontFamily: FL, fontSize: 7, fontWeight: 700,
               letterSpacing: '0.14em', textTransform: 'uppercase',
@@ -879,7 +881,7 @@ function DraftComplete({ state, onNav, cupDrivers }) {
           borderBottom: i === players.length-1 ? 'none' : `0.5px solid ${T.line2}`,
         }}>
           <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
-            <PlayerBadge player={p} size={22}/>
+            <PlayerBadge player={p} size={22} onClick={() => onNav('team', { playerId: p.id })}/>
             <span style={{ fontFamily: FD, fontSize:18, fontWeight:600, letterSpacing:'-0.03em' }}>{p.name}</span>
           </div>
           {Object.keys(cfg.allotments).map(series => {

@@ -148,7 +148,7 @@ export default function RecapScreen({ state, onNav, viewWk, onConsumeViewWk }) {
           borderBottom: i === sortedRes.length-1 ? 'none' : `0.5px solid ${T.line2}`,
         }}>
           <div style={{ fontFamily: FD, fontSize:18, fontWeight:600, width:22, color: i === 0 ? T.hot : T.ink, fontVariantNumeric:'tabular-nums' }}>{String(i+1).padStart(2,'0')}</div>
-          <PlayerBadge player={p} size={24}/>
+          <PlayerBadge player={p} size={24} onClick={() => onNav('team', { playerId: p.id })}/>
           <div style={{ flex:1, fontFamily: FD, fontSize:18, fontWeight:600, letterSpacing:'-0.03em' }}>{p.name}</div>
           <div style={{ fontFamily: FB, fontSize:15, fontWeight: i === 0 ? 600 : 500, fontVariantNumeric:'tabular-nums', color: i === 0 ? T.hot : T.ink }}>{p.pts}</div>
         </div>
@@ -167,7 +167,7 @@ export default function RecapScreen({ state, onNav, viewWk, onConsumeViewWk }) {
               borderBottom: i === arr.length-1 ? 'none' : `0.5px solid ${T.line2}`,
             }}>
               <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
-                <PlayerBadge player={p} size={20}/>
+                <PlayerBadge player={p} size={20} onClick={() => onNav('team', { playerId: p.id })}/>
                 <span style={{ fontFamily: FD, fontSize:16, fontWeight:600, letterSpacing:'-0.03em' }}>{p.name}</span>
                 <span style={{ marginLeft:'auto', fontFamily: FB, fontSize:14, fontWeight:500, fontVariantNumeric:'tabular-nums' }}>{last.pts[p.id] || 0} pts</span>
               </div>
