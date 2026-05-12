@@ -1,4 +1,5 @@
 import { Analytics } from '@vercel/analytics/next';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 
 export const metadata = {
   title: 'Harvest Moon',
@@ -29,6 +30,7 @@ export default function RootLayout({ children }) {
       <body style={{ margin: 0, background: '#0a0806' }}>
         {children}
         <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );
