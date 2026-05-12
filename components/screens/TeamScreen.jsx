@@ -17,25 +17,19 @@ function SeriesTag({ series }) {
   }}>{meta.short}</span>;
 }
 
-export default function TeamScreen({ state, me, viewingPlayerId, onConsumeViewingPlayer, onNav }) {
+export default function TeamScreen({ state, me, viewingPlayerId, onNav }) {
   const { currentWeek, players, draftState, draftHistory = [], weeklyResults = [] } = state;
   const cfg = getWeekConfig(state, currentWeek);
 
-  // The "subject" is whose team we're rendering. Falls back to me when no
-  // viewing prop is set. The component used to be hard-bound to me; we keep
-  // every downstream filter referencing subject so flipping the prop alone
-  // changes the view.
+  // The "subject" is whose team we're rendering. Read straight from the prop:
+  // the parent (HarvestMoon) clears the stash on Back, on explicit Team-tab
+  // taps, and overwrites it on new playerId navs — so we don't latch it
+  // locally. Latching would either flash my-team after the parent's clear or
+  // strand a stale view when the user taps Team to "go home."
   const subject = (viewingPlayerId && viewingPlayerId !== me.id)
     ? (players.find(p => p.id === viewingPlayerId) || me)
     : me;
   const viewingOther = subject.id !== me.id;
-
-  // Consume the stash on first read so back/forward navigation can't
-  // accidentally re-open the same player's view.
-  React.useEffect(() => {
-    if (viewingPlayerId) onConsumeViewingPlayer?.();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewingPlayerId]);
 
   // Current-week roster — group picks by series so bonus drivers render in
   // their own labeled sections rather than mingled with the Cup picks.

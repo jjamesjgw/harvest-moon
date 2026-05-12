@@ -111,7 +111,8 @@ export default function App() {
   const [pendingDriverNum, setPendingDriverNum] = useState(null);
   // Same pattern for "view another player's team". Set when a PlayerBadge
   // is tapped anywhere in the app; cleared on Back, on explicit Team-tab
-  // taps, and once TeamScreen consumes it.
+  // taps, and overwritten when a new playerId arrives. TeamScreen reads
+  // this directly — clearing it here flips the view back to "my team."
   const [pendingViewingPlayerId, setPendingViewingPlayerId] = useState(null);
   // Deep-link target for RecapScreen when navigated via Home's Last Race
   // strip or similar entry points. Defaults to "latest finalized week"
@@ -389,7 +390,7 @@ export default function App() {
     'enter-results': <EnterResultsScreen  state={state} setState={setState} me={me} onNav={onNav}/>,
     'edit-results':  <EnterResultsScreen  state={state} setState={setState} me={me} onNav={(id, p) => { if (id === 'back') setEditingWeek(null); onNav(id, p); }} editWeek={editingWeek}/>,
     standings:       <StandingsScreen     state={state} me={me} onNav={onNav}/>,
-    team:            <TeamScreen          state={state} me={me} viewingPlayerId={pendingViewingPlayerId} onConsumeViewingPlayer={() => setPendingViewingPlayerId(null)} onNav={onNav}/>,
+    team:            <TeamScreen          state={state} me={me} viewingPlayerId={pendingViewingPlayerId} onNav={onNav}/>,
     recap:           <RecapScreen         state={state} onNav={onNav} viewWk={pendingRecapWk} onConsumeViewWk={() => setPendingRecapWk(null)}/>,
     more:            <MoreScreen          state={state} me={me} onNav={onNav} onReset={resetSeason} onSignOut={() => setMeId(null)}/>,
     profile:         <ProfileScreen       state={state} setState={setState} me={me} saveStatus={saveStatus} onBack={() => onNav('back')}/>,
