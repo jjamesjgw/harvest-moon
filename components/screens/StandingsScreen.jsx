@@ -179,6 +179,7 @@ export default function StandingsScreen({ state, me, onNav }) {
           completedWeeks={completedWeeks}
           sorted={sorted}
           me={me}
+          onNav={onNav}
         />
       </div>
     </>}
@@ -194,7 +195,7 @@ export default function StandingsScreen({ state, me, onNav }) {
 // toggles two booleans (hasMoreLeft / hasMoreRight). The pip points in
 // the direction the user can still scroll, mirroring how iOS surfaces
 // scrollable areas in apps like Photos.
-function ScrollableWeekTable({ completedWeeks, sorted, me }) {
+function ScrollableWeekTable({ completedWeeks, sorted, me, onNav }) {
   const scrollRef = useRef(null);
   const [hasMoreLeft, setHasMoreLeft] = useState(false);
   const [hasMoreRight, setHasMoreRight] = useState(false);
