@@ -9,18 +9,17 @@ create table if not exists public.leagues (
   updated_at  timestamptz default now()
 );
 
--- 2. Enable row-level security + open policy
---    (This makes the league world-writable using only the public anon key.
---     Fine for a 6-player private league. Tighten later if you want real auth.)
+-- 2. Enable row-level security. Anon can SELECT (needed for the client's
+--    initial pull and the realtime subscription) but cannot write — every
+--    mutating call has to go through /api/league, which uses the service-
+--    role key. Login is gated by /api/auth/login → hm_session cookie.
 alter table public.leagues enable row level security;
 
 drop policy if exists "anon read"   on public.leagues;
 drop policy if exists "anon insert" on public.leagues;
 drop policy if exists "anon update" on public.leagues;
 
-create policy "anon read"   on public.leagues for select using (true);
-create policy "anon insert" on public.leagues for insert with check (true);
-create policy "anon update" on public.leagues for update using (true) with check (true);
+create policy "anon read" on public.leagues for select using (true);
 
 -- 3. Broadcast row changes over the Realtime channel
 alter publication supabase_realtime add table public.leagues;
