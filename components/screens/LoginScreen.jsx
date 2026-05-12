@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
-import { ADMIN_PROFILE, FB, FD, FI, FL, FM, PLAYER_PINS, T } from '@/lib/constants';
+import { ADMIN_PROFILE, FB, FD, FI, FL, FM, T } from '@/lib/constants';
 import { supabase } from '@/lib/supabase';
 
 // Tile-based login. Six player avatars in a 3×2 grid + a discreet "Admin"
@@ -37,19 +37,15 @@ export default function LoginScreen({ onLogin, players }) {
   // function reads bcrypt-hashed PINs from a table that's locked off from
   // anon entirely; only this function (SECURITY DEFINER) can read it.
   // Returns one of:
-  //   { ok: true }           — PIN matched
-  //   { ok: false }          — PIN didn't match (auth failure — do NOT fall back)
-  //   { ok: false, transport: true } — couldn't reach server (use local fallback)
+  //   { ok: true }                   — PIN matched
+  //   { ok: false }                  — PIN didn't match (auth failure)
+  //   { ok: false, transport: true } — couldn't reach server (network/outage)
+  // The transport branch surfaces a distinct user message so people know to
+  // retry instead of staring at "Incorrect PIN" during a Supabase blip.
   const verifyServerSide = async (name, candidatePin) => {
     try {
       const { data, error } = await supabase.rpc('verify_pin', { p_name: name, p_pin: candidatePin });
-      if (error) {
-        // Treat any RPC error as a transport problem rather than a hard auth
-        // rejection — keeps the league able to sign in even if the function
-        // is temporarily missing or rate-limited. The client-side fallback
-        // catches it.
-        return { ok: false, transport: true };
-      }
+      if (error) return { ok: false, transport: true };
       return { ok: data === true };
     } catch {
       return { ok: false, transport: true };
@@ -68,29 +64,15 @@ export default function LoginScreen({ onLogin, players }) {
         : players.find(p => p.name.toLowerCase() === activeKey);
       if (!account) { setErr('Could not load your profile. Try again.'); return; }
 
-      // Try server-side verification first.
       const result = await verifyServerSide(activeKey, pin);
       if (result.ok) {
         setErr(null);
         onLogin(account);
         return;
       }
-      // Server rejected the PIN outright (not a transport error). Show error,
-      // do NOT fall back to client check — that would defeat the purpose.
-      if (!result.transport) {
-        setErr('Incorrect PIN.');
-        return;
-      }
-
-      // Transport failure (offline, rate-limited, RPC missing). Fall back to
-      // the bundled PIN check so the league isn't locked out by a Supabase
-      // outage. The bundled PINs will be removed in a follow-up drop once
-      // we're confident the server path is reliable.
-      const expected = PLAYER_PINS[activeKey];
-      if (!expected) { setErr('Profile not found.'); return; }
-      if (pin !== expected) { setErr('Incorrect PIN.'); return; }
-      setErr(null);
-      onLogin(account);
+      setErr(result.transport
+        ? 'Sign-in is offline. Try again in a moment.'
+        : 'Incorrect PIN.');
     } finally {
       setBusy(false);
     }
