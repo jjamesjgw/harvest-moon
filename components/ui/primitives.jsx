@@ -661,10 +661,70 @@ export function OnTheClockBanner({ pickerName, progress, onTap }) {
   </button>;
 }
 
-export function SaveBanner({ status, error, onRetry }) {
+// Map raw error strings + flags to a user-facing category. Friendly copy
+// lives in COPY below — keep technical terms out of what the user reads.
+function categorizeSaveError(error, sessionExpired) {
+  if (sessionExpired) return 'session';
+  const msg = String(error || '').toLowerCase();
+  if (!msg) return 'unknown';
+  if (
+    msg.includes('failed to fetch') ||
+    msg.includes('networkerror') ||
+    msg.includes('load failed') ||
+    msg.includes('could not reach') ||
+    msg.includes('refresh failed')
+  ) return 'network';
+  if (
+    msg.includes('bad-json') ||
+    msg.includes('bad-state') ||
+    msg.includes('bad-write-id') ||
+    msg.includes('bad-client-tag') ||
+    msg.includes('refused-fresh') ||
+    msg.includes('bad-origin')
+  ) return 'app-bug';
+  if (
+    msg.includes('preflight-failed') ||
+    msg.includes('upsert-failed') ||
+    msg.includes('save failed (5') ||
+    msg.includes('save failed (4')
+  ) return 'server';
+  return 'unknown';
+}
+
+const SAVE_BANNER_COPY = {
+  session: {
+    headline: 'You were signed out.',
+    detail: 'Pick your name below to sign back in. Your picks are safe on this device.',
+    action: null, // login screen is the action
+  },
+  network: {
+    headline: "You're offline.",
+    detail: 'Your picks are safe on this device and will sync when you reconnect.',
+    action: 'Retry',
+  },
+  server: {
+    headline: "The league server isn't responding.",
+    detail: 'Your picks are safe on this device. Try again in a moment.',
+    action: 'Retry',
+  },
+  'app-bug': {
+    headline: 'The app hit a snag.',
+    detail: 'Your picks are safe on this device. Please text Justin so he can take a look.',
+    action: 'Retry',
+  },
+  unknown: {
+    headline: "Saves aren't going through right now.",
+    detail: 'Your picks are safe on this device. Tap Retry — if it keeps happening, text Justin.',
+    action: 'Retry',
+  },
+};
+
+export function SaveBanner({ status, error, sessionExpired, onRetry }) {
   const [dismissed, setDismissed] = useState(false);
   useEffect(() => { if (status !== 'error') setDismissed(false); }, [status]);
   if (status !== 'error' || dismissed) return null;
+  const category = categorizeSaveError(error, sessionExpired);
+  const copy = SAVE_BANNER_COPY[category];
   return <div style={{
     background: 'rgba(200,16,46,0.95)', color: '#FFF',
     paddingTop:'max(8px, env(safe-area-inset-top))',
@@ -673,15 +733,18 @@ export function SaveBanner({ status, error, onRetry }) {
     display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0,
   }}>
     <div style={{ flex: 1, fontWeight:500 }}>
-      Saves not syncing. Your data is backed up locally on this device.
+      <div>{copy.headline}</div>
+      <div style={{ fontFamily: FL, fontWeight: 400, fontSize: 11, marginTop: 2, opacity: 0.92 }}>
+        {copy.detail}
+      </div>
     </div>
-    <button onClick={onRetry} style={{
+    {copy.action && <button onClick={onRetry} style={{
       appearance:'none', background:'rgba(255,255,255,0.18)',
       border:'0.5px solid rgba(255,255,255,0.5)', color:'#FFF',
       padding:'5px 9px', borderRadius:3, cursor:'pointer',
       fontFamily: FL, fontSize:9, fontWeight:500,
       letterSpacing:'0.18em', textTransform:'uppercase', flexShrink:0,
-    }}>Retry</button>
+    }}>{copy.action}</button>}
     <button onClick={() => setDismissed(true)} aria-label="Dismiss" style={{
       appearance:'none', background:'transparent', border:'none', color:'rgba(255,255,255,0.7)',
       cursor:'pointer', fontSize:18, lineHeight:1, flexShrink:0,
