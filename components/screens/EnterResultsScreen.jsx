@@ -95,7 +95,7 @@ function AllStarEntryForm({ state, setState, me, currentRace, onNav, targetWeek,
     <TopBar
       subtitle={`Wk ${String(targetWeek).padStart(2,'0')} · All-Star Race${isPastEdit ? ' · Editing' : ''}`}
       title={isPastEdit ? 'Edit All-Star' : 'All-Star Winner'}
-      right={<BackChip onClick={() => onNav(isPastEdit ? 'history' : 'home')}/>}
+      right={<BackChip onClick={() => onNav('back')}/>}
     />
 
     {/* Intro panel — same dark hero treatment as normal week, with the
@@ -373,7 +373,7 @@ export default function EnterResultsScreen({ state, setState, me, onNav, editWee
     <TopBar
       subtitle={`Wk ${String(targetWeek).padStart(2,'0')} · ${currentRace?.track || ''}${isPastEdit ? ' · Editing' : ''}`}
       title={isPastEdit ? 'Edit Results' : 'Results'}
-      right={<BackChip onClick={() => onNav(isPastEdit ? 'history' : 'home')}/>}
+      right={<BackChip onClick={() => onNav('back')}/>}
     />
 
     <div style={{ padding:'0 20px 16px' }}>

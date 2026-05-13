@@ -29,7 +29,7 @@ export default function RecapScreen({ state, onNav, viewWk, onConsumeViewWk }) {
 
   if (weeklyResults.length === 0) {
     return <div style={{ paddingBottom:20 }}>
-      <TopBar title="Race Recap" right={<BackChip onClick={() => onNav('more')}/>}/>
+      <TopBar title="Race Recap" right={<BackChip onClick={() => onNav('back')}/>}/>
       <div style={{ padding:'40px 28px', textAlign:'center' }}>
         <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:16, color: T.mute, lineHeight:1.5 }}>
           No completed races yet. Once you finish the first week, the recap will appear here.
@@ -105,7 +105,7 @@ export default function RecapScreen({ state, onNav, viewWk, onConsumeViewWk }) {
     <TopBar
       subtitle={`Wk ${String(last.wk).padStart(2,'0')} · Final`}
       title="Race Recap"
-      right={<BackChip onClick={() => onNav('more')}/>}
+      right={<BackChip onClick={() => onNav('back')}/>}
     />
 
     <div style={{ padding:'0 20px 20px' }}>

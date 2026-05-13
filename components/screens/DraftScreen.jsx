@@ -234,7 +234,7 @@ export default function DraftScreen({ state, setState, me, onNav }) {
       <TopBar
         subtitle={`${currentRace?.track || ''} · Wk ${String(currentWeek).padStart(2,'0')}`}
         title="Draft"
-        right={<BackChip onClick={() => onNav('home')} label="Exit"/>}
+        right={<BackChip onClick={() => onNav('back')} label="Exit"/>}
       />
       <div style={{ padding:'0 20px 4px' }}>
         <OnTheClock
