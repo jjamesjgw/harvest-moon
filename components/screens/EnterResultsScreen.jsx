@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { BackChip, CarNum, LabeledInput, PlayerBadge, SectionLabel, TopBar } from '@/components/ui/primitives';
 import { ADMIN_ID, FB, FD, FI, FL, FM, SERIES, T } from '@/lib/constants';
-import { DEFAULT_DRIVERS } from '@/lib/data';
+import { DEFAULT_DRIVERS, DEFAULT_SCHEDULE } from '@/lib/data';
 import { ptsKey, lookupPts, rollupPts } from '@/lib/scoring';
 import { getBonusPool, getWeekConfig } from '@/lib/utils';
 
@@ -47,23 +47,34 @@ function AllStarEntryForm({ state, setState, me, currentRace, onNav, targetWeek,
       return;
     }
     setAdvanceArm(false);
+    // IMPORTANT: source the All-Star picks and track from `currentRace`
+    // (from the migrated state view in the outer closure), NOT from
+    // `s.schedule` inside this updater. `s` is the raw remote state,
+    // and the schedule is never persisted to Supabase — migrateState
+    // always overlays DEFAULT_SCHEDULE at read time. So `s.schedule`
+    // here is the stale pre-PR schedule, where wk 13 was Charlotte
+    // and `allStarPicks` doesn't exist — reading from it would write
+    // 0 pts for every player. The DEFAULT_SCHEDULE constant is the
+    // source of truth, and `currentRace` already came from there.
     setState(s => {
       const ex = s.weeklyResults.find(w => w.wk === targetWeek) || {};
-      const sched = s.schedule.find(sc => sc.wk === targetWeek);
       const pts = {};
       s.players.forEach(p => {
-        const pick = (sched?.allStarPicks || {})[p.id];
+        const pick = picks[p.id];
         pts[p.id] = pick != null && parsedWinner === pick ? 50 : 0;
       });
       const newRes = {
-        ...ex, wk: targetWeek, track: sched?.track,
+        ...ex, wk: targetWeek, track: currentRace.track,
         pts, allStarWinnerNum: parsedWinner, finalized: true,
       };
       // Past-edit doesn't advance the week. Live entry advances normally,
       // resetting draftState so the next week's slot-pick can begin.
       const willAdvance = !isPastEdit;
       const nextWeek = willAdvance ? targetWeek + 1 : s.currentWeek;
-      const hasNext = !!s.schedule.find(sc => sc.wk === nextWeek);
+      // hasNext checks against the imported DEFAULT_SCHEDULE constant
+      // for the same reason we don't use `s.schedule` for picks/track —
+      // `s.schedule` is the stale server-persisted schedule.
+      const hasNext = DEFAULT_SCHEDULE.some(sc => sc.wk === nextWeek);
       const newWkExtras = hasNext ? ((s.weekDriversExtra || {})[nextWeek] || []) : [];
       return {
         ...s,
@@ -264,10 +275,14 @@ export default function EnterResultsScreen({ state, setState, me, onNav, editWee
   const totalDrafted = Object.values(draftedBySeries).reduce((s, list) => s + list.length, 0);
 
   // Live patch — every keystroke recomputes pts so non-admin standings stay current.
+  // NOTE: source `track` from DEFAULT_SCHEDULE rather than `s.schedule` —
+  // the persisted server schedule lags behind code (it's overwritten in
+  // the migrated view only), so post-renumber wks (14+) would otherwise
+  // get the old/wrong track name baked into weeklyResults.
   const patchWeek = (updates) => {
     setState(s => {
       const ex = s.weeklyResults.find(w => w.wk === targetWeek) || {};
-      const track = s.schedule.find(sc => sc.wk === targetWeek)?.track;
+      const track = DEFAULT_SCHEDULE.find(sc => sc.wk === targetWeek)?.track;
       const wkPicks = isPastEdit
         ? ((s.draftHistory || []).find(h => h.wk === targetWeek)?.picks || [])
         : (s.draftState?.picks || []);
@@ -313,7 +328,9 @@ export default function EnterResultsScreen({ state, setState, me, onNav, editWee
     setAdvanceArm(false);
     setState(s => {
       const ex = s.weeklyResults.find(w => w.wk === s.currentWeek) || {};
-      const track = s.schedule.find(sc => sc.wk === s.currentWeek)?.track;
+      // Source track and hasNext from DEFAULT_SCHEDULE — see patchWeek
+      // note above for why s.schedule is unreliable.
+      const track = DEFAULT_SCHEDULE.find(sc => sc.wk === s.currentWeek)?.track;
       const pts = rollupPts(
         s.players,
         s.draftState?.picks || [],
@@ -331,7 +348,7 @@ export default function EnterResultsScreen({ state, setState, me, onNav, editWee
         });
       }
       const nextWeek = s.currentWeek + 1;
-      const hasNext = !!s.schedule.find(sc => sc.wk === nextWeek);
+      const hasNext = DEFAULT_SCHEDULE.some(sc => sc.wk === nextWeek);
       const newWkExtras = hasNext ? ((s.weekDriversExtra || {})[nextWeek] || []) : [];
       return {
         ...s,

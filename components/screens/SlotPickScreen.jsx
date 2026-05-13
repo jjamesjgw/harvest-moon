@@ -6,12 +6,13 @@ import { buildSlotPickOrder, getWeekConfig } from '@/lib/utils';
 
 export default function SlotPickScreen({ state, setState, me, onNav }) {
   const { players, weeklyResults, currentWeek, draftState } = state;
-  // All-Star weeks suspend the draft entirely — render a paused panel
-  // explaining the format and showing the locked picks instead.
+  // All-Star weeks suspend the draft. We MUST evaluate the all-star
+  // branch only AFTER all hooks below have been called — otherwise the
+  // hook count differs between regular and all-star renders, which
+  // React forbids ("Rendered fewer hooks than expected"). So compute
+  // the flag here and short-circuit at the JSX return below.
   const currentRace = state.schedule.find(s => s.wk === currentWeek);
-  if (currentRace?.format === 'all-star') {
-    return <AllStarDraftPaused state={state} me={me} currentRace={currentRace} onNav={onNav} screenLabel="Slot Pick"/>;
-  }
+  const isAllStar = currentRace?.format === 'all-star';
   const cfg = getWeekConfig(state, currentWeek);
   const pickOrder = buildSlotPickOrder(players, weeklyResults, currentWeek - 1);
   const idx = draftState.slotPickIdx;
@@ -67,6 +68,12 @@ export default function SlotPickScreen({ state, setState, me, onNav }) {
     const t = setTimeout(() => setCountdown(c => c - 1), 1000);
     return () => clearTimeout(t);
   }, [countdown]);
+
+  // Branch AFTER all hooks have run so the hook count stays stable
+  // across regular/all-star renders (see comment near top).
+  if (isAllStar) {
+    return <AllStarDraftPaused state={state} me={me} currentRace={currentRace} onNav={onNav} screenLabel="Slot Pick"/>;
+  }
 
   return <div style={{ paddingBottom: 20 }}>
     <TopBar
