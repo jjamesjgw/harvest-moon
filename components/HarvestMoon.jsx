@@ -152,6 +152,50 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionExpired]);
 
+  // One-shot All-Star Race schedule shift. Wk 13 was Charlotte in the
+  // original 2026 schedule; Dover All-Star was inserted at wk 13 and
+  // everything from old-wk-13 onward shifted +1. We need to rename any
+  // wk-keyed state that referenced the OLD numbering. For most users this
+  // is a no-op (no wk≥13 data exists yet on May 13), so the migration just
+  // stamps `allStarShifted: true` to mark the flag and avoid re-running.
+  // Gated on rawState so we only touch the unshifted server payload, not
+  // the migrated view; persists via setStateRemote so the shift is durable.
+  useEffect(() => {
+    if (!rawState || rawState.allStarShifted) return;
+    setStateRemote(prev => {
+      if (!prev || prev.allStarShifted) return prev;
+      const shiftWkInArray = (arr) => (arr || []).map(e =>
+        e && typeof e.wk === 'number' && e.wk >= 13 ? { ...e, wk: e.wk + 1 } : e
+      );
+      const shiftWkKeyed = (obj) => {
+        const out = {};
+        for (const [k, v] of Object.entries(obj || {})) {
+          const wk = Number(k);
+          out[Number.isFinite(wk) && wk >= 13 ? String(wk + 1) : k] = v;
+        }
+        return out;
+      };
+      const hasPostShiftData = (prev.weeklyResults || []).some(w => w.wk >= 13)
+        || (prev.draftHistory || []).some(h => h.wk >= 13);
+      return {
+        ...prev,
+        weeklyResults: shiftWkInArray(prev.weeklyResults),
+        draftHistory: shiftWkInArray(prev.draftHistory),
+        weekConfig: shiftWkKeyed(prev.weekConfig),
+        bonusDriversByWeek: shiftWkKeyed(prev.bonusDriversByWeek),
+        weekDriversExtra: shiftWkKeyed(prev.weekDriversExtra),
+        // Only bump currentWeek if user was already past the old wk 13 —
+        // i.e., they'd finalized what was Charlotte. Otherwise leave it so
+        // the new wk 13 (Dover All-Star) becomes the next race they see.
+        currentWeek: hasPostShiftData && prev.currentWeek >= 13
+          ? prev.currentWeek + 1
+          : prev.currentWeek,
+        allStarShifted: true,
+      };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rawState?.allStarShifted]);
+
   // Scroll back to top whenever we change screens.
   useEffect(() => {
     if (contentRef.current) contentRef.current.scrollTop = 0;

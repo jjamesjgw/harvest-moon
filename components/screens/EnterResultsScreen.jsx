@@ -6,6 +6,201 @@ import { DEFAULT_DRIVERS } from '@/lib/data';
 import { ptsKey, lookupPts, rollupPts } from '@/lib/scoring';
 import { getBonusPool, getWeekConfig } from '@/lib/utils';
 
+// All-Star Race entry form — used when targetWeek's schedule entry has
+// format: 'all-star'. The All-Star is a non-points exhibition: the only
+// scoring is a 50-pt all-or-nothing bonus to anyone who picked the
+// winner. So instead of a per-driver points grid, the admin enters
+// just the winning driver number; we derive pts directly from
+// currentRace.allStarPicks vs the winner. Saving advances normally.
+function AllStarEntryForm({ state, setState, me, currentRace, onNav, targetWeek, isPastEdit }) {
+  const isAdmin = me.id === ADMIN_ID;
+  const existing = state.weeklyResults.find(w => w.wk === targetWeek);
+  const [winnerNum, setWinnerNum] = useState(
+    existing?.allStarWinnerNum != null ? String(existing.allStarWinnerNum) : ''
+  );
+  const picks = currentRace.allStarPicks || {};
+  const pool = state.drivers || DEFAULT_DRIVERS;
+  const driverFor = (num) =>
+    pool.find(d => d.num === num)
+    || DEFAULT_DRIVERS.find(d => d.num === num)
+    || null;
+
+  const parsedWinner = parseInt(winnerNum, 10);
+  const winnerValid = Number.isFinite(parsedWinner);
+  const winnerDriver = winnerValid ? driverFor(parsedWinner) : null;
+
+  // Preview each player's resulting points. 50 if they picked the entered
+  // winner, otherwise 0. Always renders so the admin can sanity-check
+  // before committing.
+  const previewPts = {};
+  state.players.forEach(p => {
+    const pick = picks[p.id];
+    previewPts[p.id] = winnerValid && pick != null && parsedWinner === pick ? 50 : 0;
+  });
+
+  const [advanceArm, setAdvanceArm] = useState(false);
+  const saveAndAdvance = () => {
+    if (!winnerValid) return;
+    if (!advanceArm) {
+      setAdvanceArm(true);
+      setTimeout(() => setAdvanceArm(false), 3000);
+      return;
+    }
+    setAdvanceArm(false);
+    setState(s => {
+      const ex = s.weeklyResults.find(w => w.wk === targetWeek) || {};
+      const sched = s.schedule.find(sc => sc.wk === targetWeek);
+      const pts = {};
+      s.players.forEach(p => {
+        const pick = (sched?.allStarPicks || {})[p.id];
+        pts[p.id] = pick != null && parsedWinner === pick ? 50 : 0;
+      });
+      const newRes = {
+        ...ex, wk: targetWeek, track: sched?.track,
+        pts, allStarWinnerNum: parsedWinner, finalized: true,
+      };
+      // Past-edit doesn't advance the week. Live entry advances normally,
+      // resetting draftState so the next week's slot-pick can begin.
+      const willAdvance = !isPastEdit;
+      const nextWeek = willAdvance ? targetWeek + 1 : s.currentWeek;
+      const hasNext = !!s.schedule.find(sc => sc.wk === nextWeek);
+      const newWkExtras = hasNext ? ((s.weekDriversExtra || {})[nextWeek] || []) : [];
+      return {
+        ...s,
+        weeklyResults: [...s.weeklyResults.filter(w => w.wk !== targetWeek), newRes],
+        currentWeek: willAdvance && hasNext ? nextWeek : s.currentWeek,
+        drivers: willAdvance && hasNext ? [...DEFAULT_DRIVERS, ...newWkExtras] : s.drivers,
+        draftState: willAdvance && hasNext
+          ? { phase:'slot-pick', slotPickIdx:0, slotAssign:{}, currentRound:1, picks:[] }
+          : s.draftState,
+      };
+    });
+    setTimeout(() => onNav(isPastEdit ? 'history' : 'home'), 200);
+  };
+
+  const sorted = [...state.players].sort((a, b) => (previewPts[b.id] || 0) - (previewPts[a.id] || 0));
+
+  return <div style={{ paddingBottom:20 }}>
+    <TopBar
+      subtitle={`Wk ${String(targetWeek).padStart(2,'0')} · All-Star Race${isPastEdit ? ' · Editing' : ''}`}
+      title={isPastEdit ? 'Edit All-Star' : 'All-Star Winner'}
+      right={<BackChip onClick={() => onNav(isPastEdit ? 'history' : 'home')}/>}
+    />
+
+    {/* Intro panel — same dark hero treatment as normal week, with the
+        copper accent that marks All-Star throughout the app. */}
+    <div style={{ padding:'0 20px 16px' }}>
+      <div style={{
+        background: T.ink, color: T.bg, borderRadius:4,
+        border:`1px solid ${T.hot}`, padding:'18px 20px',
+      }}>
+        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
+          <span style={{ color: T.hot, fontSize:12, lineHeight:1 }}>★</span>
+          <div style={{
+            fontFamily: FL, fontSize:9, fontWeight:600,
+            letterSpacing:'0.28em', textTransform:'uppercase', color: T.hot,
+          }}>{isAdmin ? 'Commissioner Entry · All-Star' : 'Waiting on Commissioner'}</div>
+        </div>
+        <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:14, color:'rgba(247,244,237,0.85)', lineHeight:1.5 }}>
+          {isAdmin
+            ? 'Enter the winning driver number. Anyone who picked the winner gets +50 points; everyone else gets 0.'
+            : 'Admin will enter the All-Star winner after the race. Picks are already locked.'}
+        </div>
+      </div>
+    </div>
+
+    {/* Winner input (admin) */}
+    {isAdmin && <>
+      <SectionLabel>Winning Driver</SectionLabel>
+      <div style={{ padding:'14px 20px 20px' }}>
+        <div style={{
+          background: T.card, border:`1px solid ${T.line}`, borderRadius:4,
+          padding:'14px 16px',
+          display:'flex', alignItems:'center', gap:14,
+        }}>
+          <input
+            type="number" inputMode="numeric"
+            value={winnerNum}
+            onChange={e => setWinnerNum(e.target.value)}
+            placeholder="#"
+            style={{
+              width:90, textAlign:'center', padding:'12px 8px',
+              border:`1px solid ${T.line}`, borderRadius:3,
+              background: T.bg, outline:'none', color: T.ink,
+              fontFamily: FB, fontSize:22, fontWeight:700, fontVariantNumeric:'tabular-nums',
+            }}/>
+          <div style={{ flex:1, minWidth:0 }}>
+            {winnerDriver ? <>
+              <div style={{ fontFamily: FD, fontSize:18, fontWeight:600, letterSpacing:'-0.02em' }}>{winnerDriver.name}</div>
+              <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:11, color: T.mute, marginTop:3 }}>
+                № {winnerDriver.num} · {winnerDriver.team || '—'}
+              </div>
+            </> : <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:12, color: T.mute }}>
+              {winnerValid ? `Driver #${parsedWinner} not in pool — bonus will still apply if anyone picked them.` : 'Enter the car number that won the race.'}
+            </div>}
+          </div>
+        </div>
+      </div>
+    </>}
+
+    {/* Preview standings */}
+    <SectionLabel>Standings · This Week</SectionLabel>
+    <div style={{ padding:'14px 20px 20px' }}>
+      {sorted.map((p, i) => {
+        const total = previewPts[p.id] || 0;
+        const pick = picks[p.id];
+        const pickDriver = pick != null ? driverFor(pick) : null;
+        return <div key={p.id} style={{
+          padding:'14px 0',
+          borderBottom: i === sorted.length-1 ? 'none' : `0.5px solid ${T.line2}`,
+          display:'flex', alignItems:'center', gap:12,
+        }}>
+          <div style={{
+            fontFamily: FD, fontSize:18, fontWeight:600, width:22,
+            color: total > 0 ? T.hot : T.ink, fontVariantNumeric:'tabular-nums',
+          }}>{String(i+1).padStart(2,'0')}</div>
+          <PlayerBadge player={p} size={26}/>
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ fontFamily: FD, fontSize:16, fontWeight:600, letterSpacing:'-0.02em' }}>{p.name}</div>
+            <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:11, color: T.mute, marginTop:2 }}>
+              {pickDriver ? `Picked #${pickDriver.num} ${pickDriver.name}` : 'No pick on file'}
+            </div>
+          </div>
+          <div style={{ textAlign:'right' }}>
+            <div style={{
+              fontFamily: FB, fontSize:20, fontWeight:600,
+              fontVariantNumeric:'tabular-nums',
+              color: total > 0 ? T.hot : T.ink,
+            }}>{total}</div>
+            {total > 0 && <div style={{ fontFamily: FM, fontSize:9, color: T.hot, marginTop:2, letterSpacing:'0.04em' }}>+50 BONUS</div>}
+          </div>
+        </div>;
+      })}
+    </div>
+
+    {isAdmin && <div style={{ padding:'0 20px 20px' }}>
+      <button onClick={saveAndAdvance} disabled={!winnerValid} style={{
+        appearance:'none', width:'100%', padding:16,
+        background: !winnerValid ? T.line : (advanceArm ? T.hot : T.ink),
+        color: !winnerValid ? T.mute : (advanceArm ? T.ink : T.bg),
+        border:'none', borderRadius:3,
+        cursor: winnerValid ? 'pointer' : 'not-allowed',
+        fontFamily: FL, fontSize:11, fontWeight:600,
+        letterSpacing:'0.24em', textTransform:'uppercase',
+      }}>{!winnerValid
+        ? 'Enter Winning Driver Number'
+        : advanceArm
+          ? (isPastEdit ? 'Tap again to confirm edit' : `Tap again to confirm — locks Wk ${String(targetWeek).padStart(2,'0')}`)
+          : (isPastEdit ? 'Save Edit →' : `Save & Advance to Week ${String(targetWeek+1).padStart(2,'0')} →`)}</button>
+      <div style={{ marginTop:10, fontFamily: FI, fontStyle:'italic', fontSize:12, color: T.mute, textAlign:'center', lineHeight:1.5 }}>
+        {isPastEdit
+          ? 'Standings will recalculate based on the new winner.'
+          : 'This locks the All-Star result and starts the next regular week.'}
+      </div>
+    </div>}
+  </div>;
+}
+
 export default function EnterResultsScreen({ state, setState, me, onNav, editWeek }) {
   const targetWeek = editWeek || state.currentWeek;
   const isPastEdit = editWeek != null && editWeek !== state.currentWeek;
@@ -13,6 +208,16 @@ export default function EnterResultsScreen({ state, setState, me, onNav, editWee
   const { players, schedule, weeklyResults, draftState, draftHistory = [] } = state;
   const currentRace = schedule.find(s => s.wk === targetWeek);
   const isAdmin = me.id === ADMIN_ID;
+
+  // All-Star weeks use a totally different scoring model (one pre-locked
+  // pick per player, 50-pt bonus if they picked the winner). Branch to
+  // the dedicated form before deriving the regular driver-points grid.
+  if (currentRace?.format === 'all-star') {
+    return <AllStarEntryForm
+      state={state} setState={setState} me={me} currentRace={currentRace}
+      onNav={onNav} targetWeek={targetWeek} isPastEdit={isPastEdit}
+    />;
+  }
 
   const existing = weeklyResults.find(w => w.wk === targetWeek);
   const driverPoints = existing?.driverPoints || {};

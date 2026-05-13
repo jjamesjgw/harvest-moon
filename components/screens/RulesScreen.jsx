@@ -80,6 +80,20 @@ export default function RulesScreen({ state, onBack }) {
       </Rule>
     </div>
 
+    <SectionLabel>All-Star Race</SectionLabel>
+    <div style={{ padding:'8px 20px 20px' }}>
+      <Rule term="Special Format">
+        The All-Star Race is a non-points exhibition. No draft, no slot picks.
+        Every player has a single locked pick for the week — same driver allowed
+        across players.
+      </Rule>
+      <Rule term="The Bonus" last>
+        All-or-nothing. If your driver wins, you get <strong>+50 points</strong> on
+        your season total. If they don't, you get 0 for the week. The regular
+        draft resumes the week after.
+      </Rule>
+    </div>
+
     <SectionLabel>The Weekly Draft</SectionLabel>
     <div style={{ padding:'8px 20px 20px' }}>
       <Rule term="Step 1 · Slot Picks">

@@ -1,6 +1,7 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
 import { T, FD, FI, FL, FB } from '@/lib/constants';
+import { DEFAULT_DRIVERS } from '@/lib/data';
 import { raceCountdown } from '@/lib/utils';
 
 // ─── BASIC ATOMS ─────────────────────────────────────────────────
@@ -126,6 +127,96 @@ export function TopBar({ title, subtitle, right, style = {} }) {
       }}>{title}</div>
     </div>
     {right}
+  </div>;
+}
+
+// All-Star weeks suspend the normal draft flow. SlotPickScreen and
+// DraftScreen render this paused panel instead — explains the format,
+// shows everyone's locked pick, and points the user back home where
+// the All-Star hero lives. Re-used so both screens stay in sync.
+export function AllStarDraftPaused({ state, me, currentRace, onNav, screenLabel }) {
+  // Resolve picks to drivers using the same fallback pattern as elsewhere.
+  // DEFAULT_DRIVERS is the canonical Cup pool; bonus/extras don't apply here.
+  const picks = currentRace?.allStarPicks || {};
+  const pool = state.drivers || DEFAULT_DRIVERS;
+  const driverFor = (num) =>
+    pool.find(d => d.num === num)
+    || DEFAULT_DRIVERS.find(d => d.num === num)
+    || { num, name: `#${num}`, primary: T.mute, secondary: T.ink };
+
+  return <div style={{ paddingBottom:20 }}>
+    <TopBar
+      subtitle={`Wk ${String(state.currentWeek).padStart(2,'0')} · All-Star Race`}
+      title={screenLabel || 'Draft Paused'}
+      right={<BackChip onClick={() => onNav('home')}/>}
+    />
+    <div style={{ padding:'0 20px 20px' }}>
+      <div style={{
+        background: T.ink, color: T.bg, borderRadius:4,
+        border:`1px solid ${T.hot}`, overflow:'hidden',
+      }}>
+        <div style={{ padding:'20px 20px 16px' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
+            <span style={{ color: T.hot, fontSize:13, lineHeight:1 }}>★</span>
+            <div style={{
+              fontFamily: FL, fontSize:9, fontWeight:600,
+              letterSpacing:'0.28em', textTransform:'uppercase', color: T.hot,
+            }}>Draft Paused · All-Star Week</div>
+          </div>
+          <div style={{
+            fontFamily: FD, fontSize:24, fontWeight:600,
+            letterSpacing:'-0.02em', lineHeight:1.1,
+          }}>No draft this week.</div>
+          <div style={{
+            fontFamily: FI, fontStyle:'italic', fontSize:13,
+            color:'rgba(247,244,237,0.7)', marginTop:8, lineHeight:1.45,
+          }}>
+            The All-Star Race uses pre-locked picks — one driver per player. Anyone whose driver wins gets a 50-point bonus, all-or-nothing. The normal draft resumes next week.
+          </div>
+        </div>
+        <div style={{
+          padding:'14px 16px 16px',
+          borderTop:'0.5px solid rgba(247,244,237,0.08)',
+          background:'rgba(247,244,237,0.025)',
+        }}>
+          <div style={{
+            fontFamily: FL, fontSize:9, fontWeight:600,
+            letterSpacing:'0.24em', textTransform:'uppercase',
+            color:'rgba(247,244,237,0.5)', marginBottom:10, paddingLeft:4,
+          }}>Locked Picks</div>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(2, 1fr)', gap:8 }}>
+            {state.players.map(p => {
+              const driverNum = picks[p.id];
+              const driver = driverNum != null ? driverFor(driverNum) : null;
+              const isMe = p.id === me.id;
+              return <div key={p.id} style={{
+                display:'flex', alignItems:'center', gap:8,
+                padding:'8px 10px', borderRadius:3,
+                background: isMe ? 'rgba(184,147,90,0.14)' : 'rgba(247,244,237,0.04)',
+                border: isMe ? `0.5px solid rgba(184,147,90,0.5)` : `0.5px solid rgba(247,244,237,0.06)`,
+                minWidth: 0,
+              }}>
+                <PlayerBadge player={p} size={22}/>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{
+                    fontFamily: FL, fontSize:8, fontWeight:600,
+                    letterSpacing:'0.16em', textTransform:'uppercase',
+                    color: isMe ? T.hot : 'rgba(247,244,237,0.55)',
+                  }}>{isMe ? 'You' : p.name}</div>
+                  <div style={{
+                    fontFamily: FB, fontSize:12, fontWeight:600,
+                    color:'rgba(247,244,237,0.95)', marginTop:1,
+                    whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis',
+                  }}>
+                    {driver ? <>#{driver.num} {driver.name}</> : <span style={{ color:'rgba(247,244,237,0.4)', fontStyle:'italic' }}>—</span>}
+                  </div>
+                </div>
+              </div>;
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
   </div>;
 }
 

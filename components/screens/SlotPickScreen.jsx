@@ -1,11 +1,17 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { BackChip, PlayerBadge, SectionLabel, TopBar } from '@/components/ui/primitives';
+import { AllStarDraftPaused, BackChip, PlayerBadge, SectionLabel, TopBar } from '@/components/ui/primitives';
 import { FB, FD, FI, FL, SERIES, T } from '@/lib/constants';
 import { buildSlotPickOrder, getWeekConfig } from '@/lib/utils';
 
 export default function SlotPickScreen({ state, setState, me, onNav }) {
   const { players, weeklyResults, currentWeek, draftState } = state;
+  // All-Star weeks suspend the draft entirely — render a paused panel
+  // explaining the format and showing the locked picks instead.
+  const currentRace = state.schedule.find(s => s.wk === currentWeek);
+  if (currentRace?.format === 'all-star') {
+    return <AllStarDraftPaused state={state} me={me} currentRace={currentRace} onNav={onNav} screenLabel="Slot Pick"/>;
+  }
   const cfg = getWeekConfig(state, currentWeek);
   const pickOrder = buildSlotPickOrder(players, weeklyResults, currentWeek - 1);
   const idx = draftState.slotPickIdx;
