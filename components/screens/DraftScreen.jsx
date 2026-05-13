@@ -1,6 +1,6 @@
 'use client';
 import React, { useEffect, useState, useMemo, useRef } from 'react';
-import { BackChip, CarNum, PlayerBadge, SectionLabel, TopBar } from '@/components/ui/primitives';
+import { AllStarDraftPaused, BackChip, CarNum, PlayerBadge, SectionLabel, TopBar } from '@/components/ui/primitives';
 import { FB, FD, FI, FL, ROUNDS_PER_WEEK, SERIES, T } from '@/lib/constants';
 import { DEFAULT_DRIVERS } from '@/lib/data';
 import {
@@ -16,6 +16,12 @@ const pickKey = (series, num) => `${series}:${num}`;
 export default function DraftScreen({ state, setState, me, onNav }) {
   const { players, schedule, currentWeek, draftState, adminId, weekDriversExtra = {} } = state;
   const currentRace = schedule.find(s => s.wk === currentWeek);
+  // All-Star weeks suspend the snake draft. We MUST evaluate the all-star
+  // branch only AFTER all hooks below have been called — early-returning
+  // here would make the hook count vary between renders, which React
+  // forbids. Compute the flag, run every hook normally, then short-circuit
+  // at the JSX return.
+  const isAllStar = currentRace?.format === 'all-star';
   const isAdmin = me.id === adminId;
   const [resetArm, setResetArm] = useState(false);
 
@@ -216,6 +222,12 @@ export default function DraftScreen({ state, setState, me, onNav }) {
   const showToggle = !done && pickIdx > 0;
   const showStrip = !done && pickIdx > 0 && mode === 'pick';
   const showSeriesTabs = !done && cfg.bonusSeries.length > 0 && currentPicker && mode === 'pick';
+
+  // Branch AFTER all hooks have run so the hook count stays stable
+  // across regular/all-star renders (see comment near top).
+  if (isAllStar) {
+    return <AllStarDraftPaused state={state} me={me} currentRace={currentRace} onNav={onNav} screenLabel="Draft"/>;
+  }
 
   return <div style={{ paddingBottom:20, display:'flex', flexDirection:'column', minHeight:'100%' }}>
     <div style={{ position:'sticky', top:0, zIndex:5, background: T.bg, paddingBottom:10 }}>

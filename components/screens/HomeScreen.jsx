@@ -1,8 +1,8 @@
 'use client';
 import React from 'react';
-import { CarNum, LinkArrow, RaceCountdown, SectionLabel, TopBar } from '@/components/ui/primitives';
+import { CarNum, LinkArrow, PlayerBadge, RaceCountdown, SectionLabel, TopBar } from '@/components/ui/primitives';
 import { InstallHint } from '@/components/ui/InstallHint';
-import { ADMIN_ID, FB, FD, FI, FL, T } from '@/lib/constants';
+import { ADMIN_ID, FB, FD, FI, FL, FM, T } from '@/lib/constants';
 import { computeAllDriverStats, computeStandings, getWeekConfig, ordinalSuffix, raceCountdown } from '@/lib/utils';
 import { DEFAULT_DRIVERS } from '@/lib/data';
 import { RACE_QUOTES } from '@/lib/quotes';
@@ -176,6 +176,151 @@ function LastRaceStrip({ state, me, onNav }) {
   </>;
 }
 
+// ─── ALL-STAR HERO ───────────────────────────────────────────────
+// The All-Star Race is a non-points exhibition. The week has no draft;
+// every player has a single locked pick (in `currentRace.allStarPicks`)
+// and the only scoring is a 50-pt all-or-nothing bonus to anyone who
+// picked the race winner. The hero card needs to look distinctly
+// different from a regular Cup week so the league knows the format
+// changed — copper accents on the dark ink ground, the picks rendered
+// inline as 6 mini badge+car chips, and a "+50 BONUS" callout.
+function AllStarHero({ state, me, currentRace, raceLive, resultsDue, isAdmin, onNav }) {
+  const picks = currentRace.allStarPicks || {};
+  const pool = state.drivers || DEFAULT_DRIVERS;
+  const driverFor = (num) =>
+    pool.find(d => d.num === num)
+    || DEFAULT_DRIVERS.find(d => d.num === num)
+    || { num, name: `#${num}`, primary: T.mute, secondary: T.ink };
+
+  const eyebrow = raceLive ? 'Live · All-Star Underway'
+    : resultsDue ? 'Race Day · Winner Pending'
+    : 'All-Star · Exhibition';
+
+  const status = raceLive ? 'Locked picks — green flag dropped'
+    : resultsDue ? (isAdmin ? 'Enter the winner to apply the bonus' : 'Waiting on commissioner')
+    : 'Locked picks · 50 pts all-or-nothing';
+
+  return <div style={{ padding:'0 20px 16px' }}>
+    <div style={{
+      background: T.ink, color: T.bg, borderRadius:4, overflow:'hidden',
+      // Distinct copper outline marks the special week without competing
+      // with the existing hero typography. 1px keeps it editorial, not flashy.
+      border:`1px solid ${T.hot}`,
+      boxShadow:'0 8px 24px rgba(184,147,90,0.18)',
+      position:'relative',
+    }}>
+      <div style={{ padding:'20px 20px 18px' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:14 }}>
+          <span style={{ color: T.hot, fontSize:13, lineHeight:1, transform:'translateY(-1px)' }}>★</span>
+          <div style={{
+            fontFamily: FL, fontSize:9, fontWeight: raceLive ? 700 : 600,
+            letterSpacing:'0.28em', color: T.hot, textTransform:'uppercase',
+          }}>{eyebrow}</div>
+          <div style={{
+            fontFamily: FL, fontSize:9, fontWeight:400, letterSpacing:'0.18em',
+            color:'rgba(247,244,237,0.4)', textTransform:'uppercase', marginLeft:'auto',
+          }}>Week {String(state.currentWeek).padStart(2,'0')}</div>
+        </div>
+
+        <div style={{ fontFamily: FD, fontSize:44, fontWeight:600, lineHeight:0.95, letterSpacing:'-0.03em' }}>
+          {currentRace.raceName || 'All-Star Race'}
+        </div>
+        <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:13, color:'rgba(247,244,237,0.7)', marginTop:6, letterSpacing:'0.01em' }}>
+          {currentRace.track}
+        </div>
+
+        {/* Bonus rule callout — the whole reason this week looks different */}
+        <div style={{
+          marginTop:14, padding:'10px 12px',
+          background:'rgba(184,147,90,0.10)',
+          border:`0.5px solid rgba(184,147,90,0.4)`,
+          borderRadius:3,
+          display:'flex', alignItems:'baseline', gap:10,
+        }}>
+          <div style={{ fontFamily: FM, fontSize:18, fontWeight:700, color: T.hot, letterSpacing:'-0.02em' }}>+50</div>
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ fontFamily: FL, fontSize:9, fontWeight:600, letterSpacing:'0.22em', textTransform:'uppercase', color: T.hot }}>Bonus</div>
+            <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:12, color:'rgba(247,244,237,0.85)', marginTop:2 }}>
+              All-or-nothing. Pick the winner, take the points.
+            </div>
+          </div>
+        </div>
+
+        {(currentRace.time || currentRace.network) && <div style={{ marginTop:12 }}>
+          <RaceCountdown
+            date={currentRace.date}
+            time={currentRace.time}
+            network={currentRace.network}
+            tone="dark"
+          />
+        </div>}
+      </div>
+
+      {/* Locked picks grid — 6 mini chips, one per player */}
+      <div style={{
+        padding:'14px 16px 16px',
+        borderTop:'0.5px solid rgba(247,244,237,0.08)',
+        background:'rgba(247,244,237,0.025)',
+      }}>
+        <div style={{
+          fontFamily: FL, fontSize:9, fontWeight:600,
+          letterSpacing:'0.24em', textTransform:'uppercase',
+          color:'rgba(247,244,237,0.5)', marginBottom:10, paddingLeft:4,
+        }}>Locked Picks</div>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:8 }}>
+          {state.players.map(p => {
+            const driverNum = picks[p.id];
+            const driver = driverNum != null ? driverFor(driverNum) : null;
+            const isMe = p.id === me.id;
+            return <div key={p.id} style={{
+              display:'flex', alignItems:'center', gap:8,
+              padding:'7px 9px', borderRadius:3,
+              background: isMe ? 'rgba(184,147,90,0.14)' : 'rgba(247,244,237,0.04)',
+              border: isMe ? `0.5px solid rgba(184,147,90,0.5)` : `0.5px solid rgba(247,244,237,0.06)`,
+              minWidth: 0,
+            }}>
+              <PlayerBadge player={p} size={22}/>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{
+                  fontFamily: FL, fontSize:8, fontWeight:600,
+                  letterSpacing:'0.16em', textTransform:'uppercase',
+                  color: isMe ? T.hot : 'rgba(247,244,237,0.55)',
+                  whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis',
+                }}>{isMe ? 'You' : p.name}</div>
+                <div style={{
+                  fontFamily: FB, fontSize:11, fontWeight:600,
+                  color:'rgba(247,244,237,0.95)', marginTop:1,
+                  whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis',
+                }}>
+                  {driver ? <>#{driver.num} {driver.name}</> : <span style={{ color:'rgba(247,244,237,0.4)', fontStyle:'italic' }}>—</span>}
+                </div>
+              </div>
+            </div>;
+          })}
+        </div>
+      </div>
+
+      <div style={{
+        padding:'14px 20px',
+        borderTop:'0.5px solid rgba(247,244,237,0.08)',
+        display:'flex', gap:12, alignItems:'center',
+      }}>
+        <div style={{ flex:1 }}>
+          <div style={{ fontFamily: FL, fontSize:9, letterSpacing:'0.24em', textTransform:'uppercase', color:'rgba(247,244,237,0.4)' }}>Status</div>
+          <div style={{ fontFamily: FB, fontSize:13, marginTop:3, color:'rgba(247,244,237,0.85)' }}>{status}</div>
+        </div>
+        {isAdmin && <button onClick={() => onNav('enter-results')} style={{
+          appearance:'none', background:'transparent', color: T.bg,
+          border:`0.5px solid ${T.hot}`,
+          padding:'9px 16px', borderRadius:3, cursor:'pointer',
+          fontFamily: FL, fontWeight:600, fontSize:10,
+          letterSpacing:'0.2em', textTransform:'uppercase', color: T.hot,
+        }}>{resultsDue || raceLive ? 'Enter Winner →' : 'Set Winner'}</button>}
+      </div>
+    </div>
+  </div>;
+}
+
 function RaceQuote({ state }) {
   const wk = state.currentWeek || 1;
   const quote = RACE_QUOTES[(wk - 1) % RACE_QUOTES.length];
@@ -222,11 +367,14 @@ export default function HomeScreen({ state, me, onNav }) {
   const meStanding = standings.find(s => s.id === me.id);
   const upcoming = schedule.filter(s => s.wk > currentWeek).slice(0, 2);
 
+  const isAllStar = currentRace.format === 'all-star';
   const phase = draftState?.phase || 'not-started';
   const cfg = getWeekConfig(state, currentWeek);
   const totalPicks = cfg.totalPicks * players.length;
   const pickCount = draftState?.picks?.length || 0;
-  const draftComplete = phase === 'done' || pickCount >= totalPicks;
+  // All-Star weeks have no draft — the picks are pre-locked on the
+  // schedule entry, so treat the draft as "complete" for status logic.
+  const draftComplete = isAllStar || phase === 'done' || pickCount >= totalPicks;
 
   // Detect "results due": draft for this week is done but no finalized result yet.
   const thisWeekResult = weeklyResults.find(w => w.wk === currentWeek);
@@ -278,8 +426,9 @@ export default function HomeScreen({ state, me, onNav }) {
 
     {/* "Results due" callout — shows above the hero only when this is the
         admin's pending action, so it grabs attention. Non-admins still see
-        the inline status note in the hero card below. */}
-    {resultsDue && isAdmin && <div style={{ padding:'0 20px 14px' }}>
+        the inline status note in the hero card below. Suppressed on All-Star
+        weeks because the dedicated hero already prompts admin action. */}
+    {resultsDue && isAdmin && !isAllStar && <div style={{ padding:'0 20px 14px' }}>
       <button onClick={() => onNav('enter-results')} style={{
         appearance:'none', width:'100%', textAlign:'left',
         background:'linear-gradient(180deg, #C9A268 0%, #B8935A 50%, #9A7A48 100%)',
@@ -301,8 +450,11 @@ export default function HomeScreen({ state, me, onNav }) {
       </button>
     </div>}
 
-    {/* Hero card: this week's race */}
-    <div style={{ padding:'0 20px 16px' }}>
+    {/* Hero card: All-Star weeks get a dedicated treatment so the format
+        change is unmistakable; everything else uses the standard race hero. */}
+    {isAllStar
+      ? <AllStarHero state={state} me={me} currentRace={currentRace} raceLive={raceLive} resultsDue={resultsDue} isAdmin={isAdmin} onNav={onNav}/>
+      : <div style={{ padding:'0 20px 16px' }}>
       <div style={{ background: T.ink, color: T.bg, borderRadius:4, overflow:'hidden', position:'relative' }}>
         <div style={{ padding:'20px 20px 18px' }}>
           <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:14 }}>
@@ -363,7 +515,7 @@ export default function HomeScreen({ state, me, onNav }) {
           }}>{ctaLabel}</button>
         </div>
       </div>
-    </div>
+    </div>}
 
     {/* Your standing */}
     <div style={{ padding:'0 20px 20px' }}>
@@ -389,7 +541,9 @@ export default function HomeScreen({ state, me, onNav }) {
 
     <StatOfTheSeason state={state} onNav={onNav}/>
 
-    <YourRosterStrip state={state} me={me} onNav={onNav}/>
+    {/* Roster strip is for the regular Cup draft. All-Star picks already
+        appear inline on the dedicated hero — no need to repeat them here. */}
+    {!isAllStar && <YourRosterStrip state={state} me={me} onNav={onNav}/>}
 
     <LastRaceStrip state={state} me={me} onNav={onNav}/>
 

@@ -97,6 +97,7 @@ export default function ScheduleScreen({ state, onBack, onNav }) {
       </div> : filtered.map((race, idx) => {
         const isNow = race.wk === currentWeek;
         const isPast = race.wk < currentWeek;
+        const isAllStar = race.format === 'all-star';
         const cfg = getWeekConfig(state, race.wk);
         const hasBonus = cfg.bonusSeries.length > 0;
         return <button key={race.wk} onClick={() => setOpenWk(race.wk)} style={{
@@ -113,15 +114,27 @@ export default function ScheduleScreen({ state, onBack, onNav }) {
           </div>
           <div style={{ flex:1, minWidth:0 }}>
             <div style={{ fontFamily: FD, fontSize:18, fontWeight:600, letterSpacing:'-0.03em', lineHeight:1.1, color: isNow ? T.hot : T.ink }}>
+              {isAllStar && <span style={{ color: T.hot, marginRight:6 }}>★</span>}
               {race.raceName || race.track}
             </div>
             {race.raceName && <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:12, color: T.ink2, marginTop:3 }}>
               {race.track}
             </div>}
             <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:12, color: T.mute, marginTop:race.raceName ? 2 : 3 }}>
-              {race.type} · {race.len} mi · {race.laps} laps
+              {isAllStar
+                ? 'Exhibition · One pick · +50 if your driver wins'
+                : `${race.type} · ${race.len} mi · ${race.laps} laps`}
             </div>
-            {hasBonus && <div style={{
+            {isAllStar && <div style={{
+              marginTop:6, display:'inline-flex', alignItems:'center', gap:4,
+              padding:'2px 8px',
+              background:'transparent', color: T.hot,
+              border:`0.5px solid ${T.hot}`,
+              borderRadius:2,
+              fontFamily: FL, fontSize:9, fontWeight:700,
+              letterSpacing:'0.2em', textTransform:'uppercase',
+            }}>All-Star</div>}
+            {hasBonus && !isAllStar && <div style={{
               marginTop:6, display:'inline-flex', alignItems:'center', gap:4,
               padding:'2px 8px', background: T.hot, color:'#fff',
               borderRadius:2,
