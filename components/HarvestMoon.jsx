@@ -196,6 +196,32 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rawState?.allStarShifted]);
 
+  // Persist the canonical DEFAULT_SCHEDULE onto the remote row when the
+  // stored copy lags behind code. `migrateState` already overlays
+  // DEFAULT_SCHEDULE onto the *rendered* view, but `setState(s => ...)`
+  // updaters receive the raw Supabase payload — and that payload's
+  // `schedule` field is whatever was last persisted. Without this, any
+  // updater that reads `s.schedule.find(...)` gets the stale schedule
+  // (e.g. wk 13 still shows Charlotte without `allStarPicks`), which is
+  // the class of bug Codex caught on PR #20. The call sites already
+  // route around `s.schedule`, but persisting the new schedule closes
+  // the door on the same shape of bug being reintroduced.
+  //
+  // Detection is feature-specific: if the stored schedule lacks the
+  // All-Star marker, it's out of date. Idempotent — runs once and the
+  // dep flips so the effect short-circuits next render.
+  useEffect(() => {
+    if (!rawState?.schedule) return;
+    const hasAllStarEntry = rawState.schedule.some(s => s.format === 'all-star');
+    if (hasAllStarEntry) return;
+    setStateRemote(prev => {
+      if (!prev) return prev;
+      if ((prev.schedule || []).some(s => s.format === 'all-star')) return prev;
+      return { ...prev, schedule: DEFAULT_SCHEDULE };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rawState?.schedule]);
+
   // Scroll back to top whenever we change screens.
   useEffect(() => {
     if (contentRef.current) contentRef.current.scrollTop = 0;
