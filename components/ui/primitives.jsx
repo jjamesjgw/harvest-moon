@@ -754,9 +754,21 @@ export function OnTheClockBanner({ pickerName, progress, onTap }) {
 
 // Map raw error strings + flags to a user-facing category. Friendly copy
 // lives in COPY below — keep technical terms out of what the user reads.
+//
+// We require BOTH `sessionExpired` AND a matching auth-related error
+// message before classifying as 'session'. `useLeague` only clears
+// `sessionExpired` on a successful write, so after a 401 the user can
+// re-sign-in via LoginScreen and immediately hit an unrelated failure
+// (network / 5xx) while the flag is still stale — without the message
+// check, the banner would keep telling them to sign in again even
+// though the live problem is a server outage.
 function categorizeSaveError(error, sessionExpired) {
-  if (sessionExpired) return 'session';
   const msg = String(error || '').toLowerCase();
+  const looksLikeAuth =
+    msg.includes('session expired') ||
+    msg.includes('unauthorized') ||
+    msg.includes('please sign in');
+  if (sessionExpired && looksLikeAuth) return 'session';
   if (!msg) return 'unknown';
   if (
     msg.includes('failed to fetch') ||
