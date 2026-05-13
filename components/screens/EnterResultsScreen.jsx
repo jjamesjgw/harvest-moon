@@ -67,6 +67,33 @@ function AllStarEntryForm({ state, setState, me, currentRace, onNav, targetWeek,
         ...ex, wk: targetWeek, track: currentRace.track,
         pts, allStarWinnerNum: parsedWinner, finalized: true,
       };
+      // Synthesize a draftHistory row from the locked All-Star picks so
+      // HistoryScreen can render the expanded standings + admin edit
+      // button. HistoryScreen gates both on `draftHistory.find(d => d.wk
+      // === w.wk)`, and without this row a finalized All-Star result
+      // shows "Draft wasn't recorded" and the admin has no way to
+      // correct a mis-entered winner from the UI. `isAllStar: true`
+      // marks the row so stats consumers can choose to skip exhibition
+      // weeks if/when that distinction matters.
+      const allStarPickRows = Object.entries(picks).map(([playerId, driverNum]) => {
+        const d = driverFor(driverNum);
+        return {
+          playerId,
+          driverNum,
+          series: 'Cup',
+          driverName: d?.name || `#${driverNum}`,
+        };
+      });
+      const draftHistory = [
+        ...(s.draftHistory || []).filter(h => h.wk !== targetWeek),
+        {
+          wk: targetWeek,
+          track: currentRace.track,
+          slotAssign: {},
+          picks: allStarPickRows,
+          isAllStar: true,
+        },
+      ];
       // Past-edit doesn't advance the week. Live entry advances normally,
       // resetting draftState so the next week's slot-pick can begin.
       const willAdvance = !isPastEdit;
@@ -79,6 +106,7 @@ function AllStarEntryForm({ state, setState, me, currentRace, onNav, targetWeek,
       return {
         ...s,
         weeklyResults: [...s.weeklyResults.filter(w => w.wk !== targetWeek), newRes],
+        draftHistory,
         currentWeek: willAdvance && hasNext ? nextWeek : s.currentWeek,
         drivers: willAdvance && hasNext ? [...DEFAULT_DRIVERS, ...newWkExtras] : s.drivers,
         draftState: willAdvance && hasNext
