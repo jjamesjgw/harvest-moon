@@ -84,7 +84,7 @@ export default function StandingsScreen({ state, me, onNav }) {
   const canCopy = completedWeeks.length > 0;
 
   return <div style={{ paddingBottom:20 }}>
-    <TopBar subtitle={`Through Week ${String(currentWeek - 1).padStart(2,'0')}`} title="Standings" right={<BackChip onClick={() => onNav('home')}/>}/>
+    <TopBar subtitle={`Through Week ${String(currentWeek - 1).padStart(2,'0')}`} title="Standings" right={<BackChip onClick={() => onNav('back')}/>}/>
 
     <div style={{ padding:'0 20px 20px' }}>
       <div style={{ background: T.ink, color: T.bg, borderRadius:4, padding:'22px 20px', position:'relative' }}>

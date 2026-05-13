@@ -79,7 +79,7 @@ export default function SlotPickScreen({ state, setState, me, onNav }) {
     <TopBar
       subtitle="Step 1 of 2"
       title="Pick your Slot"
-      right={<BackChip onClick={() => onNav('home')}/>}
+      right={<BackChip onClick={() => onNav('back')}/>}
     />
 
     <div style={{ padding:'0 20px 20px' }}>

@@ -73,7 +73,7 @@ export default function TeamScreen({ state, me, viewingPlayerId, onNav }) {
       title={viewingOther ? `${subject.name}'s Team` : 'My Team'}
       right={viewingOther
         ? <LinkArrow onClick={() => onNav('team')}>My Team</LinkArrow>
-        : <BackChip onClick={() => onNav('home')}/>
+        : <BackChip onClick={() => onNav('back')}/>
       }
     />
 

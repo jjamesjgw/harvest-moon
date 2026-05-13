@@ -148,7 +148,7 @@ export function AllStarDraftPaused({ state, me, currentRace, onNav, screenLabel 
     <TopBar
       subtitle={`Wk ${String(state.currentWeek).padStart(2,'0')} · All-Star Race`}
       title={screenLabel || 'Draft Paused'}
-      right={<BackChip onClick={() => onNav('home')}/>}
+      right={<BackChip onClick={() => onNav('back')}/>}
     />
     <div style={{ padding:'0 20px 20px' }}>
       <div style={{
