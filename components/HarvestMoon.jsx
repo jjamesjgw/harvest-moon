@@ -295,7 +295,7 @@ export default function App() {
     setScreen('home');
   };
 
-  const banner = <SaveBanner status={saveStatus} error={lastError} onRetry={retry}/>;
+  const banner = <SaveBanner status={saveStatus} error={lastError} sessionExpired={sessionExpired} onRetry={retry}/>;
 
   // The personal toast (your turn) supersedes the global on-the-clock banner so
   // the screen never stacks both. Hide both on the screens that already show
