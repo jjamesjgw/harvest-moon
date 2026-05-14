@@ -60,8 +60,14 @@ export default function SlotPickScreen({ state, setState, me, onNav }) {
     if (countdown == null) return;
     if (countdown <= 0) {
       try { navigator.vibrate?.([200, 80, 200]); } catch {}
+      // Only flip the phase to 'snake'. Navigation is handled by the
+      // phase-watcher effect in HarvestMoon (see slot→draft auto-nav),
+      // which fires AFTER the state commit and is also what catches peers
+      // observing the phase change via Supabase realtime. Calling onNav
+      // imperatively here was racy: onNav closes over `screen` from the
+      // parent render, so a realtime push that re-rendered the parent
+      // mid-countdown could leave the league sitting on the slot screen.
       setState(s => ({ ...s, draftState: { ...s.draftState, phase: 'snake' } }));
-      onNav('draft');
       return;
     }
     try { navigator.vibrate?.(60); } catch {}
