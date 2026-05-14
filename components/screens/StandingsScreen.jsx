@@ -2,7 +2,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { BackChip, PlayerBadge, SectionLabel, TopBar, WinsCount } from '@/components/ui/primitives';
 import { FB, FD, FI, FL, T } from '@/lib/constants';
-import { computeStandings } from '@/lib/utils';
 
 // Builds a plain-text version of the standings suitable for pasting into the
 // league group chat. Aligned columns via padEnd. Includes weekly-wins count
@@ -55,9 +54,8 @@ async function copyText(text) {
   }
 }
 
-export default function StandingsScreen({ state, me, onNav }) {
-  const { players, weeklyResults, currentWeek } = state;
-  const standings = computeStandings(players, weeklyResults, currentWeek - 1);
+export default function StandingsScreen({ state, me, onNav, standings }) {
+  const { weeklyResults, currentWeek } = state;
   const sorted = [...standings].sort((a,b) => b.seasonPts - a.seasonPts);
   // Bars normalized to the SPREAD between leader and last place, not to the
   // leader's absolute total. After 11 weeks of cumulative points, every

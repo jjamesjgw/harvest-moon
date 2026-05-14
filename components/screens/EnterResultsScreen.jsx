@@ -1,7 +1,7 @@
 'use client';
 import React, { useState } from 'react';
 import { BackChip, CarNum, LabeledInput, PlayerBadge, SectionLabel, TopBar } from '@/components/ui/primitives';
-import { ADMIN_ID, FB, FD, FI, FL, FM, SERIES, T } from '@/lib/constants';
+import { ADMIN_ID, ARM_TIMEOUT_MS, FB, FD, FI, FL, FM, SERIES, T } from '@/lib/constants';
 import { DEFAULT_DRIVERS, DEFAULT_SCHEDULE } from '@/lib/data';
 import { ptsKey, lookupPts, rollupPts } from '@/lib/scoring';
 import { getBonusPool, getWeekConfig } from '@/lib/utils';
@@ -43,7 +43,7 @@ function AllStarEntryForm({ state, setState, me, currentRace, onNav, targetWeek,
     if (!winnerValid) return;
     if (!advanceArm) {
       setAdvanceArm(true);
-      setTimeout(() => setAdvanceArm(false), 3000);
+      setTimeout(() => setAdvanceArm(false), ARM_TIMEOUT_MS);
       return;
     }
     setAdvanceArm(false);
@@ -350,7 +350,7 @@ export default function EnterResultsScreen({ state, setState, me, onNav, editWee
   const saveAndAdvance = () => {
     if (!advanceArm) {
       setAdvanceArm(true);
-      setTimeout(() => setAdvanceArm(false), 3000);
+      setTimeout(() => setAdvanceArm(false), ARM_TIMEOUT_MS);
       return;
     }
     setAdvanceArm(false);

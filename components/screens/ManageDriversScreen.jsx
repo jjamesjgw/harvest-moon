@@ -1,7 +1,7 @@
 'use client';
 import React, { useState } from 'react';
 import { BackChip, CarNum, SectionLabel, TopBar } from '@/components/ui/primitives';
-import { ADMIN_ID, BONUS_SERIES_IDS, FB, FD, FI, FL, SERIES, T } from '@/lib/constants';
+import { ADMIN_ID, ARM_TIMEOUT_MS, BONUS_SERIES_IDS, FB, FD, FI, FL, SERIES, T } from '@/lib/constants';
 import { getWeekConfig } from '@/lib/utils';
 
 // Generic "add a driver" form. Used for both Cup one-offs and bonus-series
@@ -75,10 +75,9 @@ function DriverRow({ driver, isExtra, removeArm, onRemove, onTryRemove, last }) 
   </div>;
 }
 
-export default function ManageDriversScreen({ state, setState, me, onBack }) {
-  const { drivers, currentWeek, schedule } = state;
+export default function ManageDriversScreen({ state, setState, me, onBack, currentRace }) {
+  const { drivers, currentWeek } = state;
   const isAdmin = me?.id === ADMIN_ID;
-  const currentRace = schedule.find(s => s.wk === currentWeek);
   const wkExtras = (state.weekDriversExtra || {})[currentWeek] || [];
   const extraNums = new Set(wkExtras.map(d => d.num));
   const cfg = getWeekConfig(state, currentWeek);
@@ -98,7 +97,7 @@ export default function ManageDriversScreen({ state, setState, me, onBack }) {
     if (!extraNums.has(num)) return;
     if (removeArm !== armKey) {
       setRemoveArm(armKey);
-      setTimeout(() => setRemoveArm(a => a === armKey ? null : a), 3000);
+      setTimeout(() => setRemoveArm(a => a === armKey ? null : a), ARM_TIMEOUT_MS);
       return;
     }
     setRemoveArm(null);
@@ -129,7 +128,7 @@ export default function ManageDriversScreen({ state, setState, me, onBack }) {
     const armKey = `${series}:${num}`;
     if (removeArm !== armKey) {
       setRemoveArm(armKey);
-      setTimeout(() => setRemoveArm(a => a === armKey ? null : a), 3000);
+      setTimeout(() => setRemoveArm(a => a === armKey ? null : a), ARM_TIMEOUT_MS);
       return;
     }
     setRemoveArm(null);

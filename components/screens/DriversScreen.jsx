@@ -1,8 +1,7 @@
 'use client';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { BackChip, CarNum, PlayerBadge, SectionLabel, TopBar } from '@/components/ui/primitives';
 import { FB, FD, FI, FL, FM, T } from '@/lib/constants';
-import { computeAllDriverStats } from '@/lib/utils';
 
 // Sort options for the leaderboard. Each option declares:
 //   id    — unique key, used in segmented control state
@@ -17,8 +16,8 @@ const SORTS = [
   { id: 'best',  label: 'Best Wk',  key: 'bestWeekPts', sort: (a,b) => (b.bestWeek?.pts||0) - (a.bestWeek?.pts||0), fmt: r => r.bestWeek?.pts || 0 },
 ];
 
-export default function DriversScreen({ state, me, onBack, initialNum, onConsumeInitial }) {
-  const all = useMemo(() => computeAllDriverStats(state), [state]);
+export default function DriversScreen({ state, me, onBack, initialNum, onConsumeInitial, driverStats }) {
+  const all = driverStats;
   const [scope, setScope] = useState('league'); // 'league' | 'mine'
   const [sortId, setSortId] = useState('total');
   const [openNum, setOpenNum] = useState(initialNum ?? null); // when set, render detail view

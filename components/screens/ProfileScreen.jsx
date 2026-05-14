@@ -3,7 +3,6 @@ import React, { useEffect, useState } from 'react';
 import { BackChip, CarNum, Field, MenuRow, PlayerBadge, SectionLabel, TopBar, WinsCount } from '@/components/ui/primitives';
 import { ADMIN_ID, FB, FD, FI, FL, T } from '@/lib/constants';
 import { DEFAULT_DRIVERS } from '@/lib/data';
-import { computeStandings } from '@/lib/utils';
 import { disablePush, enablePush, getPushStatus } from '@/lib/push';
 
 // iOS Safari requires the PWA to be installed to the home screen before
@@ -122,7 +121,7 @@ function SaveStatusPill({ status }) {
   }}>{isOk ? '✓ Saved' : 'Saving…'}</span>;
 }
 
-export default function ProfileScreen({ state, setState, me, onBack, saveStatus }) {
+export default function ProfileScreen({ state, setState, me, onBack, saveStatus, standings }) {
   const isAdmin = me.id === ADMIN_ID;
   const update = (field, val) => {
     if (isAdmin) return;
@@ -134,8 +133,7 @@ export default function ProfileScreen({ state, setState, me, onBack, saveStatus 
     }));
   };
 
-  const { weeklyResults, currentWeek } = state;
-  const mePts = isAdmin ? null : computeStandings(state.players, weeklyResults, currentWeek - 1).find(p => p.id === me.id);
+  const mePts = isAdmin ? null : standings.find(p => p.id === me.id);
 
   if (isAdmin) {
     return <div style={{ paddingBottom:20 }}>

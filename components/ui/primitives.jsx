@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
-import { T, FD, FI, FL, FB } from '@/lib/constants';
+import { COUNTDOWN_TICK_MS, T, TOAST_LIFETIME_MS, FD, FI, FL, FB } from '@/lib/constants';
 import { DEFAULT_DRIVERS } from '@/lib/data';
 import { raceCountdown } from '@/lib/utils';
 
@@ -446,8 +446,10 @@ export function JustPickedToast({ player, driver, onTap, onDismiss }) {
   // the remaining 400ms before parent removes us. The keyed `player+driver`
   // effect ensures rapid back-to-back picks each get their own full timer.
   useEffect(() => {
-    const exitTimer = setTimeout(() => setExiting(true), 2600);
-    const removeTimer = setTimeout(() => onDismiss?.(), 3000);
+    // Exit animation kicks off 400ms before removal so the slide-out has
+    // time to play before the parent unmounts us.
+    const exitTimer = setTimeout(() => setExiting(true), TOAST_LIFETIME_MS - 400);
+    const removeTimer = setTimeout(() => onDismiss?.(), TOAST_LIFETIME_MS);
     return () => { clearTimeout(exitTimer); clearTimeout(removeTimer); };
   }, [player?.id, driver?.num, onDismiss]);
 
@@ -538,7 +540,7 @@ export function YourTurnToast({ kind, progress, onGo }) {
 export function RaceCountdown({ date, time, network, tone = 'light', showNetwork = true, year }) {
   const [, tick] = useState(0);
   useEffect(() => {
-    const id = setInterval(() => tick(t => t + 1), 60_000);
+    const id = setInterval(() => tick(t => t + 1), COUNTDOWN_TICK_MS);
     return () => clearInterval(id);
   }, []);
   const cd = raceCountdown(date, time, new Date(), year);

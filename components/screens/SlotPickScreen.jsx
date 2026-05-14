@@ -4,14 +4,13 @@ import { AllStarDraftPaused, BackChip, PlayerBadge, SectionLabel, TopBar } from 
 import { FB, FD, FI, FL, SERIES, T } from '@/lib/constants';
 import { buildSlotPickOrder, getWeekConfig } from '@/lib/utils';
 
-export default function SlotPickScreen({ state, setState, me, onNav }) {
+export default function SlotPickScreen({ state, setState, me, onNav, currentRace }) {
   const { players, weeklyResults, currentWeek, draftState } = state;
   // All-Star weeks suspend the draft. We MUST evaluate the all-star
   // branch only AFTER all hooks below have been called — otherwise the
   // hook count differs between regular and all-star renders, which
   // React forbids ("Rendered fewer hooks than expected"). So compute
   // the flag here and short-circuit at the JSX return below.
-  const currentRace = state.schedule.find(s => s.wk === currentWeek);
   const isAllStar = currentRace?.format === 'all-star';
   const cfg = getWeekConfig(state, currentWeek);
   const pickOrder = buildSlotPickOrder(players, weeklyResults, currentWeek - 1);

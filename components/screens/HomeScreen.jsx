@@ -3,7 +3,7 @@ import React from 'react';
 import { CarNum, LinkArrow, PlayerBadge, RaceCountdown, SectionLabel, TopBar } from '@/components/ui/primitives';
 import { InstallHint } from '@/components/ui/InstallHint';
 import { ADMIN_ID, FB, FD, FI, FL, FM, T } from '@/lib/constants';
-import { computeAllDriverStats, computeStandings, getWeekConfig, ordinalSuffix, raceCountdown } from '@/lib/utils';
+import { getWeekConfig, ordinalSuffix, raceCountdown } from '@/lib/utils';
 import { DEFAULT_DRIVERS } from '@/lib/data';
 import { RACE_QUOTES } from '@/lib/quotes';
 
@@ -13,8 +13,8 @@ const STAT_AWARDS = [
   { key: 'bestSleeper', label: 'Sleeper',      metric: r => `${r.avgPts} avg`,     sub: r => `${r.totalPicks}× drafted` },
 ];
 
-function StatOfTheSeason({ state, onNav }) {
-  const all = React.useMemo(() => computeAllDriverStats(state), [state]);
+function StatOfTheSeason({ state, driverStats, onNav }) {
+  const all = driverStats;
   // Rotate weekly. Fall through to the next non-null award if the
   // selected slot is empty (e.g. Wk 1 before any race finalized).
   const wk = state.currentWeek || 1;
@@ -353,15 +353,16 @@ function RaceQuote({ state }) {
   </div>;
 }
 
-export default function HomeScreen({ state, me, onNav }) {
+export default function HomeScreen({ state, me, onNav, currentRace: rawCurrentRace, driverStats, standings }) {
   const { players, schedule, currentWeek, weeklyResults, draftState } = state;
-  // After Wk 36 is finalized, currentWeek can advance to 37+ until reset. Show
-  // the last race in the schedule rather than blowing up.
-  const currentRace = schedule.find(s => s.wk === currentWeek)
+  // After Wk 36 is finalized, currentWeek can advance past the schedule.
+  // The parent passes null in that case; here we fall back to the final
+  // race entry (or a synthetic off-season placeholder) so the hero card
+  // still has something to render.
+  const seasonOver = !rawCurrentRace;
+  const currentRace = rawCurrentRace
     || schedule[schedule.length - 1]
     || { track: 'Off-season', type: '—', len: 0, laps: 0, date: '', time: '', network: '' };
-  const seasonOver = !schedule.find(s => s.wk === currentWeek);
-  const standings = computeStandings(players, weeklyResults, currentWeek - 1);
   const sorted = [...standings].sort((a,b) => b.seasonPts - a.seasonPts);
   const rank = sorted.findIndex(s => s.id === me.id) + 1;
   const meStanding = standings.find(s => s.id === me.id);
@@ -539,7 +540,7 @@ export default function HomeScreen({ state, me, onNav }) {
       </div>
     </div>
 
-    <StatOfTheSeason state={state} onNav={onNav}/>
+    <StatOfTheSeason state={state} driverStats={driverStats} onNav={onNav}/>
 
     {/* Roster strip is for the regular Cup draft. All-Star picks already
         appear inline on the dedicated hero — no need to repeat them here. */}

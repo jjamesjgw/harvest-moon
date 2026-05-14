@@ -1,10 +1,10 @@
 'use client';
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { AllStarDraftPaused, BackChip, CarNum, PlayerBadge, SectionLabel, TopBar } from '@/components/ui/primitives';
-import { FB, FD, FI, FL, ROUNDS_PER_WEEK, SERIES, T } from '@/lib/constants';
+import { ARM_TIMEOUT_MS, FB, FD, FI, FL, PICK_FRESH_DURATION_MS, ROUNDS_PER_WEEK, SERIES, T } from '@/lib/constants';
 import { DEFAULT_DRIVERS } from '@/lib/data';
 import {
-  buildSnakeOrder, computeAllDriverStats, countPicksBySeries, getBonusPool,
+  buildSnakeOrder, countPicksBySeries, getBonusPool,
   getWeekConfig,
 } from '@/lib/utils';
 
@@ -13,9 +13,8 @@ import {
 // Truck), so we can't dedupe by num alone — series + num together are unique.
 const pickKey = (series, num) => `${series}:${num}`;
 
-export default function DraftScreen({ state, setState, me, onNav }) {
-  const { players, schedule, currentWeek, draftState, adminId, weekDriversExtra = {} } = state;
-  const currentRace = schedule.find(s => s.wk === currentWeek);
+export default function DraftScreen({ state, setState, me, onNav, currentRace, driverStats: rawDriverStats }) {
+  const { players, currentWeek, draftState, adminId, weekDriversExtra = {} } = state;
   // All-Star weeks suspend the snake draft. We MUST evaluate the all-star
   // branch only AFTER all hooks below have been called — early-returning
   // here would make the hook count vary between renders, which React
@@ -58,12 +57,13 @@ export default function DraftScreen({ state, setState, me, onNav }) {
 
   // Decision-support stats for each driver — total picks, avg pts/draft,
   // and the last 3 race scores when drafted. Drives the small stat block
-  // beneath each driver's name in the pool grid. Computed once per state
-  // change and reused per-card via Map lookup.
-  const driverStats = useMemo(() => {
-    const all = computeAllDriverStats(state);
-    return new Map(all.drivers.map(d => [d.num, d]));
-  }, [state]);
+  // beneath each driver's name in the pool grid. The parent already
+  // computed the array form once per state change; we just reshape it
+  // into a Map for O(1) per-card lookup.
+  const driverStats = useMemo(
+    () => new Map(rawDriverStats.drivers.map(d => [d.num, d])),
+    [rawDriverStats],
+  );
 
   // Freshly-arrived picks. Whenever the picks array grows (whether from
   // realtime push or local action), the new entries get added to a Set
@@ -103,12 +103,12 @@ export default function DraftScreen({ state, setState, me, onNav }) {
         newKeys.forEach(k => next.delete(k));
         return next;
       });
-    }, 1200);
+    }, PICK_FRESH_DURATION_MS);
     return () => clearTimeout(t);
   }, [draftState.picks]);
 
   const resetDraft = () => {
-    if (!resetArm) { setResetArm(true); setTimeout(() => setResetArm(false), 3000); return; }
+    if (!resetArm) { setResetArm(true); setTimeout(() => setResetArm(false), ARM_TIMEOUT_MS); return; }
     setState(s => ({
       ...s,
       draftState: { phase:'slot-pick', slotPickIdx:0, slotAssign:{}, currentRound:1, picks:[] },

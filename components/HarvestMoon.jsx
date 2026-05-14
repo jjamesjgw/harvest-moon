@@ -8,7 +8,7 @@ import {
 } from '@/lib/constants';
 import { DEFAULT_DRIVERS, DEFAULT_SCHEDULE } from '@/lib/data';
 import {
-  buildSlotPickOrder, buildSnakeOrder, computeStandings, detectActiveTurn, getWeekConfig, makeFreshState, draftProgressLabel,
+  buildSlotPickOrder, buildSnakeOrder, computeAllDriverStats, computeStandings, detectActiveTurn, getWeekConfig, makeFreshState, draftProgressLabel,
 } from '@/lib/utils';
 import {
   AppFrame, TabBar, OnTheClockBanner, PullToRefresh, SaveBanner, YourTurnToast,
@@ -130,6 +130,27 @@ export default function App() {
   const me = state && meId
     ? (meId === ADMIN_ID ? ADMIN_PROFILE : state.players.find(p => p.id === meId))
     : null;
+
+  // Derived state — computed once per state mutation and passed down to
+  // any screen that needs them. Hoisting these out of individual screens
+  // means the same compute doesn't run 3-5x per render across siblings,
+  // and screens stay leaner (no useMemo + import + dep dance for every
+  // consumer). `currentRace` is null after the season finale (no schedule
+  // entry matches `currentWeek`); HomeScreen uses that signal.
+  const currentRace = useMemo(
+    () => state ? state.schedule.find(s => s.wk === state.currentWeek) || null : null,
+    [state],
+  );
+  const driverStats = useMemo(
+    () => state
+      ? computeAllDriverStats(state)
+      : { drivers: [], topScorer: null, mostPicked: null, bestSleeper: null, biggestBust: null },
+    [state],
+  );
+  const standings = useMemo(
+    () => state ? computeStandings(state.players, state.weeklyResults, state.currentWeek - 1) : [],
+    [state],
+  );
 
   // Auto-init a fresh league row if Supabase has no document yet.
   // CRITICAL: gated on fetchSucceeded so a transient Supabase fetch failure
@@ -471,24 +492,24 @@ export default function App() {
   // ─── Main shell ────────────────────────────────────
 
   const screens = {
-    home:            <HomeScreen          state={state} me={me} onNav={onNav}/>,
-    slot:            <SlotPickScreen      state={state} setState={setState} me={me} onNav={onNav}/>,
-    draft:           <DraftScreen         state={state} setState={setState} me={me} onNav={onNav}/>,
+    home:            <HomeScreen          state={state} me={me} onNav={onNav} currentRace={currentRace} driverStats={driverStats} standings={standings}/>,
+    slot:            <SlotPickScreen      state={state} setState={setState} me={me} onNav={onNav} currentRace={currentRace}/>,
+    draft:           <DraftScreen         state={state} setState={setState} me={me} onNav={onNav} currentRace={currentRace} driverStats={driverStats}/>,
     'enter-results': <EnterResultsScreen  state={state} setState={setState} me={me} onNav={onNav}/>,
     'edit-results':  <EnterResultsScreen  state={state} setState={setState} me={me} onNav={(id, p) => { if (id === 'back') setEditingWeek(null); onNav(id, p); }} editWeek={editingWeek}/>,
-    standings:       <StandingsScreen     state={state} me={me} onNav={onNav}/>,
+    standings:       <StandingsScreen     state={state} me={me} onNav={onNav} standings={standings}/>,
     team:            <TeamScreen          state={state} me={me} viewingPlayerId={pendingViewingPlayerId} onNav={onNav}/>,
     recap:           <RecapScreen         state={state} onNav={onNav} viewWk={pendingRecapWk} onConsumeViewWk={() => setPendingRecapWk(null)}/>,
     more:            <MoreScreen          state={state} me={me} onNav={onNav} onReset={resetSeason} onSignOut={async () => {
       try { await fetch('/api/auth/logout', { method: 'POST' }); } catch {}
       setMeId(null);
     }}/>,
-    profile:         <ProfileScreen       state={state} setState={setState} me={me} saveStatus={saveStatus} onBack={() => onNav('back')}/>,
+    profile:         <ProfileScreen       state={state} setState={setState} me={me} saveStatus={saveStatus} standings={standings} onBack={() => onNav('back')}/>,
     schedule:        <ScheduleScreen      state={state} onNav={onNav} onBack={() => onNav('back')}/>,
     history:         <HistoryScreen       state={state} me={me} onBack={() => onNav('back')} onNav={onNav} onEdit={(wk) => { setEditingWeek(wk); onNav('edit-results'); }}/>,
     rules:           <RulesScreen         state={state} onBack={() => onNav('back')}/>,
-    drivers:         <DriversScreen       state={state} me={me} initialNum={pendingDriverNum} onConsumeInitial={() => setPendingDriverNum(null)} onBack={() => onNav('back')}/>,
-    'manage-drivers':<ManageDriversScreen state={state} setState={setState} me={me} onBack={() => onNav('back')}/>,
+    drivers:         <DriversScreen       state={state} me={me} driverStats={driverStats} initialNum={pendingDriverNum} onConsumeInitial={() => setPendingDriverNum(null)} onBack={() => onNav('back')}/>,
+    'manage-drivers':<ManageDriversScreen state={state} setState={setState} me={me} currentRace={currentRace} onBack={() => onNav('back')}/>,
   };
 
   return <AppFrame>
