@@ -229,13 +229,11 @@ export default function App() {
 
   // When the draft phase advances to 'snake' (e.g. after the slot-pick
   // countdown completes), any screen still showing the slot picker jumps
-  // forward to the actual draft board. This closes a race between
-  // SlotPickScreen's countdown setState(phase:'snake') and its imperative
-  // onNav('draft') call — onNav resolves the target via closure, so it
-  // can read the stale 'ready' phase and route back to 'slot'. This effect
-  // runs after the state update commits, so phase is guaranteed fresh.
-  // Also catches peers who see the snake-phase update land via Supabase
-  // realtime while still on the slot screen.
+  // forward to the actual draft board. This is the SOLE nav path for the
+  // slot→draft transition: SlotPickScreen flips phase to 'snake' and this
+  // effect handles navigation after the state commit. It also catches
+  // peers who observe the phase change land via Supabase realtime while
+  // still on the slot screen.
   useEffect(() => {
     if (state?.draftState?.phase === 'snake' && screen === 'slot') {
       // Don't push 'slot' onto history here: the snake draft is now active,
