@@ -594,7 +594,7 @@ function DraftGrid({ drivers, pickedKeys, activeSeries, draftState, players, onP
             position:'relative', overflow:'hidden',
             background: taken
               ? 'linear-gradient(180deg, rgba(20,17,13,0.04) 0%, rgba(20,17,13,0.08) 100%)'
-              : 'linear-gradient(180deg, #FEFCF7 0%, #F5F1E5 100%)',
+              : `linear-gradient(180deg, ${T.card} 0%, #F5F1E5 100%)`,
             border: `1px solid ${taken ? 'rgba(20,17,13,0.08)' : 'rgba(184,147,90,0.22)'}`,
             borderRadius:10,
             padding:'12px 8px 10px', cursor: taken ? 'default' : 'pointer',
@@ -804,7 +804,7 @@ function DraftBoard({ snakeOrder, picks, players, slotAssign, totalRounds, curre
                   borderRadius: 4,
                   padding: '4px 2px',
                   height: 58,
-                  background: filled ? '#FEFCF7' : 'transparent',
+                  background: filled ? T.card : 'transparent',
                   display: 'flex', flexDirection: 'column',
                   alignItems: 'center', justifyContent: 'center',
                   gap: 2,

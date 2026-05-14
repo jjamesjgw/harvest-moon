@@ -46,7 +46,7 @@ function AddDriverForm({ onCancel, onAdd, existingNums = new Set(), title }) {
         fontFamily: FL, fontSize:10, fontWeight:600, letterSpacing:'0.2em', textTransform:'uppercase', cursor:'pointer',
       }}>Add</button>
     </div>
-    {err && <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:12, color:'#C8102E', padding:'6px 2px 0', lineHeight:1.4 }}>{err}</div>}
+    {err && <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:12, color: T.danger, padding:'6px 2px 0', lineHeight:1.4 }}>{err}</div>}
   </div>;
 }
 

@@ -431,7 +431,7 @@ export default function HomeScreen({ state, me, onNav }) {
     {resultsDue && isAdmin && !isAllStar && <div style={{ padding:'0 20px 14px' }}>
       <button onClick={() => onNav('enter-results')} style={{
         appearance:'none', width:'100%', textAlign:'left',
-        background:'linear-gradient(180deg, #C9A268 0%, #B8935A 50%, #9A7A48 100%)',
+        background: T.copperGradient,
         color: T.ink, border:'1px solid rgba(255,255,255,0.18)',
         borderRadius:8, padding:'14px 16px', cursor:'pointer',
         boxShadow:'inset 0 1px 0 rgba(255,255,255,0.4), 0 6px 20px rgba(20,17,13,0.2)',

@@ -109,8 +109,8 @@ export default function LoginScreen({ onLogin, players }) {
 
   return <div style={{
     minHeight:'100%', flex:1, position:'relative',
-    background:'#0a0806',
-    backgroundImage:'radial-gradient(ellipse 80% 60% at 50% 0%, rgba(184,147,90,0.18) 0%, transparent 70%), linear-gradient(180deg, #0a0806 0%, #14110D 100%)',
+    background: T.shell,
+    backgroundImage:`radial-gradient(ellipse 80% 60% at 50% 0%, rgba(184,147,90,0.18) 0%, transparent 70%), linear-gradient(180deg, ${T.shell} 0%, ${T.ink} 100%)`,
     display:'flex', flexDirection:'column',
     paddingTop:'max(40px, calc(env(safe-area-inset-top) + 32px))',
     paddingBottom:'max(40px, calc(env(safe-area-inset-bottom) + 32px))',
@@ -151,7 +151,7 @@ export default function LoginScreen({ onLogin, players }) {
             return <button key={p.id} onClick={() => selectPlayer(key)} style={{
               appearance:'none', cursor:'pointer',
               background: isSel
-                ? 'linear-gradient(180deg, #FDFBF5 0%, #EFEBE0 100%)'
+                ? T.cardGradient
                 : 'linear-gradient(180deg, rgba(253,251,245,0.08) 0%, rgba(253,251,245,0.04) 100%)',
               border: isSel ? `2px solid ${T.hot}` : `1px solid rgba(247,244,237,0.12)`,
               borderRadius:10,
@@ -186,7 +186,7 @@ export default function LoginScreen({ onLogin, players }) {
       ) : (
         // Admin card — single full-width tile in the same family as the player tiles
         <div style={{
-          background:'linear-gradient(180deg, #FDFBF5 0%, #EFEBE0 100%)',
+          background:T.cardGradient,
           border:`2px solid ${T.hot}`,
           borderRadius:10,
           padding:'20px 18px', position:'relative', overflow:'hidden',
@@ -238,7 +238,7 @@ export default function LoginScreen({ onLogin, players }) {
           autoComplete="off"
           style={{
             width:'100%', boxSizing:'border-box', padding:'15px 18px', textAlign:'center',
-            background:'linear-gradient(180deg, #FDFBF5 0%, #EFEBE0 100%)',
+            background:T.cardGradient,
             border:`1px solid ${err ? T.hot : 'rgba(184,147,90,0.4)'}`,
             borderRadius:8, outline:'none',
             fontFamily: FM, fontSize:22, letterSpacing:'0.4em', color: T.ink, fontWeight:600,
@@ -250,7 +250,7 @@ export default function LoginScreen({ onLogin, players }) {
         }}>{err}</div>}
         <button onClick={submit} disabled={busy} style={{
           appearance:'none', width:'100%', marginTop:12, padding:16,
-          background:'linear-gradient(180deg, #C9A268 0%, #B8935A 50%, #9A7A48 100%)',
+          background: T.copperGradient,
           color: T.ink, border:'1px solid rgba(255,255,255,0.15)', borderRadius:8,
           cursor: busy ? 'default' : 'pointer',
           opacity: busy ? 0.65 : 1,
