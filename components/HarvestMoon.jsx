@@ -210,7 +210,16 @@ export default function App() {
   // Detection is feature-specific: if the stored schedule lacks the
   // All-Star marker, it's out of date. Idempotent — runs once and the
   // dep flips so the effect short-circuits next render.
+  //
+  // Gated on `fetchSucceeded && meId` for the same reason as auto-init:
+  // a transient Supabase fetch failure populates rawState from the
+  // localStorage backup, and that backup's schedule may legitimately
+  // lack the All-Star marker. Without the gate, the effect would queue
+  // a write of the entire backup state — clobbering the real league
+  // row once the debounced POST landed. `meId` is required because
+  // /api/league rejects unauthenticated writes anyway.
   useEffect(() => {
+    if (!fetchSucceeded || !meId) return;
     if (!rawState?.schedule) return;
     const hasAllStarEntry = rawState.schedule.some(s => s.format === 'all-star');
     if (hasAllStarEntry) return;
@@ -220,7 +229,7 @@ export default function App() {
       return { ...prev, schedule: DEFAULT_SCHEDULE };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rawState?.schedule]);
+  }, [rawState?.schedule, fetchSucceeded, meId]);
 
   // Scroll back to top whenever we change screens.
   useEffect(() => {
