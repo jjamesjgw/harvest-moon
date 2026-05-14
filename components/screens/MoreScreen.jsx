@@ -63,7 +63,7 @@ function ConfirmResetModal({ state, onCancel, onConfirm }) {
       overflow:'hidden',
     }}>
       <div style={{
-        background:'linear-gradient(180deg, #C8102E 0%, #A40D24 100%)',
+        background:`linear-gradient(180deg, ${T.danger} 0%, #A40D24 100%)`,
         color:'#fff', padding:'16px 20px',
       }}>
         <div style={{
@@ -90,7 +90,7 @@ function ConfirmResetModal({ state, onCancel, onConfirm }) {
             width:'100%', boxSizing:'border-box', marginTop:10,
             padding:'12px 14px',
             background: T.card,
-            border:`1px solid ${armed ? '#C8102E' : T.line}`,
+            border:`1px solid ${armed ? T.danger : T.line}`,
             borderRadius:4, outline:'none',
             fontFamily: FM, fontSize:18, fontWeight:600,
             letterSpacing:'0.18em', color: T.ink, textAlign:'center',
@@ -106,7 +106,7 @@ function ConfirmResetModal({ state, onCancel, onConfirm }) {
           }}>Cancel</button>
           <button onClick={onConfirm} disabled={!armed} style={{
             appearance:'none', flex:1, padding:14,
-            background: armed ? '#C8102E' : 'rgba(200,16,46,0.25)',
+            background: armed ? T.danger : 'rgba(200,16,46,0.25)',
             color:'#fff',
             border:'none', borderRadius:3,
             cursor: armed ? 'pointer' : 'default',

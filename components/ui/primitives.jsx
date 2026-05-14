@@ -86,7 +86,7 @@ export function SectionLabel({ children, right, style = {} }) {
 //                button (focusable, keyboard-accessible) rendered as a
 //                small text+chevron link.
 //   Destructive — used only for confirm-destruction actions. Solid red
-//                (#C8102E). Currently only the Reset Season modal.
+//                (T.danger). Currently only the Reset Season modal.
 //
 // LinkArrow normalizes the "View →" / "All →" / "Manage →" pattern that
 // previously existed as raw <span onClick> elements (not focusable, not
@@ -401,12 +401,12 @@ export function AppFrame({ children }) {
     <div style={{
       width: 390, maxWidth:'100%', height:'min(840px, calc(100vh - 48px))',
       background: T.bg, borderRadius: 40, overflow:'hidden',
-      boxShadow: '0 40px 80px rgba(0,0,0,0.4), 0 0 0 8px #1c1a16, 0 0 0 10px #2a251e',
+      boxShadow: `0 40px 80px rgba(0,0,0,0.4), 0 0 0 8px ${T.nav}, 0 0 0 10px #2a251e`,
       display:'flex', flexDirection:'column', position:'relative',
     }}>
       <div style={{
         position:'absolute', top:8, left:'50%', transform:'translateX(-50%)',
-        width:110, height:28, background:'#0a0806', borderRadius:16, zIndex:100,
+        width:110, height:28, background: T.shell, borderRadius:16, zIndex:100,
       }}/>
       <div style={{
         padding:'14px 24px 6px', display:'flex', justifyContent:'space-between', alignItems:'center',
@@ -463,7 +463,7 @@ export function JustPickedToast({ player, driver, onTap, onDismiss }) {
       left:16, right:16,
       zIndex:50,
       appearance:'none', cursor:'pointer', textAlign:'left',
-      background:'linear-gradient(180deg, #1c1a16 0%, #14110D 100%)',
+      background:`linear-gradient(180deg, ${T.nav} 0%, ${T.ink} 100%)`,
       color: T.bg,
       border:'1px solid rgba(184,147,90,0.3)',
       borderRadius:8, padding:'12px 14px',
@@ -499,7 +499,7 @@ export function JustPickedToast({ player, driver, onTap, onDismiss }) {
 export function YourTurnToast({ kind, progress, onGo }) {
   return <button onClick={onGo} style={{
     appearance:'none', display:'flex', alignItems:'center', gap:12,
-    background:'linear-gradient(180deg, #C9A268 0%, #B8935A 50%, #9A7A48 100%)',
+    background: T.copperGradient,
     color: T.ink, border:'1px solid rgba(255,255,255,0.18)',
     paddingTop:'max(10px, env(safe-area-inset-top))',
     paddingLeft:16, paddingRight:14, paddingBottom:10,
@@ -712,8 +712,8 @@ export function OnTheClockBanner({ pickerName, progress, onTap }) {
   if (!pickerName) return null;
   return <button onClick={onTap} style={{
     appearance:'none', display:'flex', alignItems:'center', gap:10,
-    background:'linear-gradient(180deg, #14110D 0%, #1c1a16 100%)',
-    color:'#F7F4ED', border:'none',
+    background:`linear-gradient(180deg, ${T.ink} 0%, ${T.nav} 100%)`,
+    color: T.bg, border:'none',
     paddingTop:'max(8px, env(safe-area-inset-top))',
     paddingLeft:16, paddingRight:14, paddingBottom:8,
     width:'100%', cursor:'pointer', textAlign:'left',

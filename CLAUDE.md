@@ -10,8 +10,8 @@ Private 6-person NASCAR fantasy league app.
 
 ## Brand & Design System
 - Aesthetic: quiet luxury editorial — warm paper, deep ink, copper accents
-- Type constants in code: FB (Archivo bold), FD (Archivo display), FI (Fraunces italic), FL (Manrope light), FM (JetBrains Mono) — these are real, do not invent new ones
-- Spacing scale, radii, palette: see `lib/tokens.*` (or create per Task G1 if absent)
+- Type constants in code: FB (Manrope body), FD (Archivo display), FI (Fraunces italic serif), FL (Archivo Narrow labels), FM (JetBrains Mono) — these are real, do not invent new ones
+- Tokens (T) and font stacks live in `lib/constants.js`
 
 ## Hard Constraints
 1. Don't break working flows. When in doubt, ship additive rather than replace.

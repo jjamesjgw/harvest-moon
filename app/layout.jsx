@@ -1,4 +1,5 @@
 import { Analytics } from '@vercel/analytics/next';
+import { T } from '@/lib/constants';
 
 export const metadata = {
   title: 'Harvest Moon',
@@ -26,7 +27,7 @@ export default function RootLayout({ children }) {
       <head>
         <link rel="apple-touch-icon" href="/icon-192.png" />
       </head>
-      <body style={{ margin: 0, background: '#0a0806' }}>
+      <body style={{ margin: 0, background: T.shell }}>
         {children}
         <Analytics />
       </body>
