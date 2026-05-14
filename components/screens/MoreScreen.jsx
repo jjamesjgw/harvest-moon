@@ -122,7 +122,9 @@ function ConfirmResetModal({ state, onCancel, onConfirm }) {
 
 export default function MoreScreen({ state, me, onNav, onReset, onSignOut }) {
   const { schedule, currentWeek, weeklyResults, adminId } = state;
-  const lastResult = weeklyResults.sort((a,b) => b.wk - a.wk)[0];
+  // Clone before sort: Array.prototype.sort mutates in place, and weeklyResults
+  // is shared React state — sorting it directly reorders the live array.
+  const lastResult = [...weeklyResults].sort((a,b) => b.wk - a.wk)[0];
   const isAdmin = me.id === adminId;
   const [resetOpen, setResetOpen] = useState(false);
 

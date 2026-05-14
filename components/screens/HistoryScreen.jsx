@@ -34,7 +34,10 @@ export default function HistoryScreen({ state, me, onBack, onEdit, onNav }) {
   const collapseAll = () => setExpanded(new Set());
 
   const isAdmin = me?.id === ADMIN_ID;
-  const results = weeklyResults.sort((a,b) => b.wk - a.wk);
+  // Clone before sort: Array.prototype.sort mutates in place, and weeklyResults
+  // is shared React state — sorting it directly reorders the live array and
+  // corrupts any other reader (cron ingest, recap derivations, etc.).
+  const results = [...weeklyResults].sort((a,b) => b.wk - a.wk);
 
   return <div style={{ paddingBottom:20 }}>
     <TopBar
