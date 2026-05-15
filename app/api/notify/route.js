@@ -32,6 +32,27 @@ function authorized(req) {
   return crypto.timingSafeEqual(a, b);
 }
 
+// Returns true iff `newPicks` is a strict extension of `oldPicks`:
+// same series/playerId/driverNum at every index of oldPicks, then zero
+// or more new entries appended. A length-only comparison can be fooled
+// by a stale write that REGRESSES picks (e.g., a cron ingest racing
+// with a live draft writes a snapshot from a few picks ago, which then
+// wins last-write on the leagues row). That would shorten newPicks
+// without growing it, and the on-clock detector would compute a
+// different active player — firing a spurious "your turn" push to
+// someone who was on-the-clock two picks ago. Diff-by-object catches it.
+function picksGrewCleanly(oldPicks, newPicks) {
+  if (newPicks.length < oldPicks.length) return false;
+  for (let i = 0; i < oldPicks.length; i++) {
+    const a = oldPicks[i], b = newPicks[i];
+    if (!a || !b) return false;
+    if (a.driverNum !== b.driverNum) return false;
+    if ((a.series || 'Cup') !== (b.series || 'Cup')) return false;
+    if (a.playerId !== b.playerId) return false;
+  }
+  return true;
+}
+
 function pickEvents(oldState, newState) {
   const events = [];
   if (!newState) return events;
@@ -41,8 +62,13 @@ function pickEvents(oldState, newState) {
   const oldResults = oldState?.weeklyResults || [];
   const newResults = newState?.weeklyResults || [];
 
+  // Gate pick + on-clock events on a clean-prefix grow check. If the
+  // diff isn't a natural draft progression (stale write, regression,
+  // divergence), neither event is legitimate.
+  const grewCleanly = picksGrewCleanly(oldPicks, newPicks);
+
   // 1. New pick appeared.
-  if (newPicks.length > oldPicks.length) {
+  if (grewCleanly && newPicks.length > oldPicks.length) {
     const last = newPicks[newPicks.length - 1];
     const picker = (newState.players || []).find((p) => p.id === last?.playerId);
     if (last && picker) {
@@ -57,10 +83,13 @@ function pickEvents(oldState, newState) {
     }
   }
 
-  // 2. On-clock changed.
+  // 2. On-clock changed. Gated on grewCleanly for the same reason:
+  // detectActiveTurn computes from draftState.picks, so a stale write
+  // that regresses picks would show a fake "turn change" that isn't
+  // backed by any actual pick action.
   const newTurn = detectActiveTurn(newState);
   const oldTurn = detectActiveTurn(oldState);
-  if (newTurn?.playerId && newTurn.playerId !== oldTurn?.playerId) {
+  if (grewCleanly && newTurn?.playerId && newTurn.playerId !== oldTurn?.playerId) {
     events.push({
       kind: 'your_turn',
       targetPlayerId: newTurn.playerId,

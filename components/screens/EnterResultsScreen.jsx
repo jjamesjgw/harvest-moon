@@ -354,37 +354,55 @@ export default function EnterResultsScreen({ state, setState, me, onNav, editWee
       return;
     }
     setAdvanceArm(false);
+    // Snapshot the target week from the outer closure. A realtime push
+    // arriving between the user's first tap (arm) and confirm tap can
+    // mutate s.currentWeek — without the snapshot we'd save to whatever
+    // week the league rolled to in the meantime instead of the week the
+    // user actually entered results for.
+    const wk = targetWeek;
     setState(s => {
-      const ex = s.weeklyResults.find(w => w.wk === s.currentWeek) || {};
+      const ex = s.weeklyResults.find(w => w.wk === wk) || {};
       // Source track and hasNext from DEFAULT_SCHEDULE — see patchWeek
       // note above for why s.schedule is unreliable.
-      const track = DEFAULT_SCHEDULE.find(sc => sc.wk === s.currentWeek)?.track;
+      const track = DEFAULT_SCHEDULE.find(sc => sc.wk === wk)?.track;
+      // Picks normally come from the live draftState. If a peer admin
+      // already saved+advanced this week, draftState was reset to a
+      // fresh slot-pick — fall back to the archived picks in
+      // draftHistory so rollupPts can still attribute points to players.
+      const picks = s.draftState?.picks?.length > 0
+        ? s.draftState.picks
+        : ((s.draftHistory || []).find(h => h.wk === wk)?.picks || []);
       const pts = rollupPts(
         s.players,
-        s.draftState?.picks || [],
+        picks,
         ex.driverPoints || {},
         ex.bonuses || {},
         ex.overrides || {},
       );
-      const newRes = { ...ex, wk: s.currentWeek, track, pts, finalized: true };
+      const newRes = { ...ex, wk, track, pts, finalized: true };
       const draftHistory = [...(s.draftHistory || [])];
-      if (s.draftState?.picks?.length > 0 && !draftHistory.find(h => h.wk === s.currentWeek)) {
+      if (picks.length > 0 && !draftHistory.find(h => h.wk === wk)) {
         draftHistory.push({
-          wk: s.currentWeek, track,
-          slotAssign: s.draftState.slotAssign,
-          picks: s.draftState.picks, // includes series + driverName per pick
+          wk, track,
+          slotAssign: s.draftState?.slotAssign || {},
+          picks, // includes series + driverName per pick
         });
       }
-      const nextWeek = s.currentWeek + 1;
+      const nextWeek = wk + 1;
       const hasNext = DEFAULT_SCHEDULE.some(sc => sc.wk === nextWeek);
-      const newWkExtras = hasNext ? ((s.weekDriversExtra || {})[nextWeek] || []) : [];
+      // Only advance currentWeek + reset draft if we'd be moving FORWARD.
+      // If a peer admin already saved+advanced past `wk`, leave their
+      // newer cursor alone — regressing currentWeek would re-bounce the
+      // league back into a finalized week.
+      const willAdvance = hasNext && nextWeek > s.currentWeek;
+      const newWkExtras = willAdvance ? ((s.weekDriversExtra || {})[nextWeek] || []) : [];
       return {
         ...s,
-        weeklyResults: [...s.weeklyResults.filter(w => w.wk !== s.currentWeek), newRes],
+        weeklyResults: [...s.weeklyResults.filter(w => w.wk !== wk), newRes],
         draftHistory,
-        currentWeek: hasNext ? nextWeek : s.currentWeek,
-        drivers: hasNext ? [...DEFAULT_DRIVERS, ...newWkExtras] : s.drivers,
-        draftState: hasNext ? { phase:'slot-pick', slotPickIdx:0, slotAssign:{}, currentRound:1, picks:[] } : s.draftState,
+        currentWeek: willAdvance ? nextWeek : s.currentWeek,
+        drivers: willAdvance ? [...DEFAULT_DRIVERS, ...newWkExtras] : s.drivers,
+        draftState: willAdvance ? { phase:'slot-pick', slotPickIdx:0, slotAssign:{}, currentRound:1, picks:[] } : s.draftState,
       };
     });
     setTimeout(() => onNav('home'), 200);
