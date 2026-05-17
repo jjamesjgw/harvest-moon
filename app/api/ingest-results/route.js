@@ -9,6 +9,7 @@ import {
   parseFinalResults,
   buildCupDriverPoints,
 } from '@/lib/raceFeed';
+import { withSnapshot } from '@/lib/db/snapshot';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -121,13 +122,18 @@ async function handle(req) {
   };
 
   const writeId = Math.floor(Date.now() / 1000);
-  const { error: writeErr } = await admin.from('leagues').upsert({
-    id: LEAGUE_ID,
-    state: newState,
-    client_tag: 'ingest-cron',
-    write_id: writeId,
-    updated_at: now.toISOString(),
-  });
+  // Snapshot before the upsert so a bad parse or scoring bug can be rolled
+  // back from leagues_snapshots. withSnapshot throws if the snapshot fails,
+  // so we never overwrite state without a recovery point.
+  const { error: writeErr } = await withSnapshot(`pre-ingest:wk${target.wk}`, () =>
+    admin.from('leagues').upsert({
+      id: LEAGUE_ID,
+      state: newState,
+      client_tag: 'ingest-cron',
+      write_id: writeId,
+      updated_at: now.toISOString(),
+    }),
+  );
   if (writeErr) return NextResponse.json({ error: writeErr.message }, { status: 500 });
 
   // The leagues_notify trigger fires on this upsert and pushes a
