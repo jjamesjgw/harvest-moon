@@ -16,11 +16,25 @@ export const dynamic = 'force-dynamic';
 
 const LEAGUE_ID = process.env.NEXT_PUBLIC_LEAGUE_ID || 'harvest-moon';
 
-const admin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY,
-  { auth: { persistSession: false } },
-);
+// Module-init env-var guard — same pattern as /api/league (#27). A missing
+// or truncated service-role key would silently fall through to anon and be
+// denied by RLS; throwing at startup makes this loud. See the 2026-05-17
+// incident for the original rationale.
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+if (!SUPABASE_URL) {
+  throw new Error('[ingest-results/route] NEXT_PUBLIC_SUPABASE_URL is missing.');
+}
+if (!SERVICE_ROLE_KEY || SERVICE_ROLE_KEY.length < 50) {
+  throw new Error(
+    '[ingest-results/route] SUPABASE_SERVICE_ROLE_KEY is missing or implausibly short ' +
+      `(length=${SERVICE_ROLE_KEY?.length ?? 0}).`,
+  );
+}
+
+const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+  auth: { persistSession: false },
+});
 
 // Accept either a Vercel cron call (Authorization: Bearer ${CRON_SECRET})
 // or a manual call (x-ingest-secret: ${INGEST_SECRET}). Two secrets so
@@ -71,7 +85,10 @@ async function handle(req) {
     .select('state')
     .eq('id', LEAGUE_ID)
     .maybeSingle();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    console.error('[ingest/select]', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
   if (!data?.state) return NextResponse.json({ skipped: 'no-league-row' });
 
   const state = data.state;
@@ -134,7 +151,10 @@ async function handle(req) {
       updated_at: now.toISOString(),
     }),
   );
-  if (writeErr) return NextResponse.json({ error: writeErr.message }, { status: 500 });
+  if (writeErr) {
+    console.error('[ingest/upsert]', writeErr);
+    return NextResponse.json({ error: writeErr.message }, { status: 500 });
+  }
 
   // The leagues_notify trigger fires on this upsert and pushes a
   // "Week N results posted" notification via /api/notify.
