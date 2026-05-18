@@ -24,6 +24,7 @@ import StandingsScreen     from '@/components/screens/StandingsScreen';
 import TeamScreen          from '@/components/screens/TeamScreen';
 import RecapScreen         from '@/components/screens/RecapScreen';
 import MoreScreen          from '@/components/screens/MoreScreen';
+import MoreSubScreen       from '@/components/screens/MoreSubScreen';
 import ProfileScreen       from '@/components/screens/ProfileScreen';
 import ScheduleScreen      from '@/components/screens/ScheduleScreen';
 import HistoryScreen       from '@/components/screens/HistoryScreen';
@@ -42,6 +43,7 @@ const SCREEN_TO_TAB = {
   more:'more', schedule:'more', history:'more', rules:'more',
   recap:'more', drivers:'more', 'manage-drivers':'more',
   profile:'more', sync:'more', 'edit-results':'more',
+  'more-league':'more', 'more-history':'more', 'more-admin':'more',
 };
 
 // Apply migrations to remote state before consumption.
@@ -507,10 +509,13 @@ export default function App() {
     standings:       <StandingsScreen     state={state} me={me} onNav={onNav}/>,
     team:            <TeamScreen          state={state} me={me} viewingPlayerId={pendingViewingPlayerId} onNav={onNav}/>,
     recap:           <RecapScreen         state={state} onNav={onNav} viewWk={pendingRecapWk} onConsumeViewWk={() => setPendingRecapWk(null)}/>,
-    more:            <MoreScreen          state={state} me={me} onNav={onNav} onReset={resetSeason} onSignOut={async () => {
+    more:            <MoreScreen          state={state} me={me} onNav={onNav} onSignOut={async () => {
       try { await fetch('/api/auth/logout', { method: 'POST' }); } catch {}
       setMeId(null);
     }}/>,
+    'more-league':   <MoreSubScreen       section="league"       state={state} me={me} onNav={onNav}/>,
+    'more-history':  <MoreSubScreen       section="history"      state={state} me={me} onNav={onNav}/>,
+    'more-admin':    <MoreSubScreen       section="commissioner" state={state} me={me} onNav={onNav} onReset={resetSeason}/>,
     profile:         <ProfileScreen       state={state} setState={setState} me={me} saveStatus={saveStatus} onBack={() => onNav('back')} viewAsUser={viewAsUser} setViewAsUser={setViewAsUser}/>,
     schedule:        <ScheduleScreen      state={state} onNav={onNav} onBack={() => onNav('back')}/>,
     history:         <HistoryScreen       state={state} me={me} onBack={() => onNav('back')} onNav={onNav} onEdit={(wk) => { setEditingWeek(wk); onNav('edit-results'); }}/>,
