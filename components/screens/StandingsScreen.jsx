@@ -69,7 +69,9 @@ export default function StandingsScreen({ state, me, onNav }) {
   const minPts = Math.min(...sorted.map(s => s.seasonPts));
   const maxPts = Math.max(...sorted.map(s => s.seasonPts));
   const spread = Math.max(1, maxPts - minPts);
-  const completedWeeks = weeklyResults.slice().sort((a,b) => a.wk - b.wk);
+  // Most recent week on the left so the table opens to current-season context
+  // without forcing a scroll to the right edge.
+  const completedWeeks = weeklyResults.slice().sort((a,b) => b.wk - a.wk);
 
   // Copy-to-clipboard state. After a successful copy we flip the chip to
   // "Copied" for ~1.5s so the user sees confirmation before it resets.
@@ -251,7 +253,10 @@ function ScrollableWeekTable({ completedWeeks, sorted, me, onNav }) {
       </div>
       {sorted.map((p, pi) => {
         const isMe = me && p.id === me.id;
-        const rowBg = isMe ? 'rgba(184,147,90,0.08)' : T.bg;
+        // Solid color (not rgba) so the sticky Player column is fully opaque
+        // when scrolling — otherwise the week-points cells visibly slide
+        // under the name. Composited from rgba(184,147,90,0.08) over T.bg.
+        const rowBg = isMe ? '#F2ECE1' : T.bg;
         return <div key={p.id} style={{
           display:'grid',
           gridTemplateColumns:`72px repeat(${completedWeeks.length}, 38px) 56px`,
