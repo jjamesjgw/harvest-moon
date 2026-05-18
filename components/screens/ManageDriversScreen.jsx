@@ -1,7 +1,7 @@
 'use client';
 import React, { useState } from 'react';
 import { BackChip, CarNum, SectionLabel, TopBar } from '@/components/ui/primitives';
-import { ADMIN_ID, BONUS_SERIES_IDS, FB, FD, FI, FL, SERIES, T } from '@/lib/constants';
+import { BONUS_SERIES_IDS, FB, FD, FI, FL, SERIES, T } from '@/lib/constants';
 import { getWeekConfig } from '@/lib/utils';
 
 // Generic "add a driver" form. Used for both Cup one-offs and bonus-series
@@ -77,7 +77,7 @@ function DriverRow({ driver, isExtra, removeArm, onRemove, onTryRemove, last }) 
 
 export default function ManageDriversScreen({ state, setState, me, onBack }) {
   const { drivers, currentWeek, schedule } = state;
-  const isAdmin = me?.id === ADMIN_ID;
+  const isAdmin = !!me?.isAdmin;
   const currentRace = schedule.find(s => s.wk === currentWeek);
   const wkExtras = (state.weekDriversExtra || {})[currentWeek] || [];
   const extraNums = new Set(wkExtras.map(d => d.num));

@@ -14,7 +14,7 @@ import {
 const pickKey = (series, num) => `${series}:${num}`;
 
 export default function DraftScreen({ state, setState, me, onNav }) {
-  const { players, schedule, currentWeek, draftState, adminId, weekDriversExtra = {} } = state;
+  const { players, schedule, currentWeek, draftState, weekDriversExtra = {} } = state;
   const currentRace = schedule.find(s => s.wk === currentWeek);
   // All-Star weeks suspend the snake draft. We MUST evaluate the all-star
   // branch only AFTER all hooks below have been called — early-returning
@@ -22,7 +22,7 @@ export default function DraftScreen({ state, setState, me, onNav }) {
   // forbids. Compute the flag, run every hook normally, then short-circuit
   // at the JSX return.
   const isAllStar = currentRace?.format === 'all-star';
-  const isAdmin = me.id === adminId;
+  const isAdmin = !!me.isAdmin;
   const [resetArm, setResetArm] = useState(false);
 
   // View mode for the draft screen body. 'pick' = the existing driver pool

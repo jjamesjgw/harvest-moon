@@ -1,7 +1,7 @@
 'use client';
 import React, { useState } from 'react';
 import { BackChip, CarNum, LabeledInput, PlayerBadge, SectionLabel, TopBar } from '@/components/ui/primitives';
-import { ADMIN_ID, FB, FD, FI, FL, FM, SERIES, T } from '@/lib/constants';
+import { FB, FD, FI, FL, FM, SERIES, T } from '@/lib/constants';
 import { DEFAULT_DRIVERS, DEFAULT_SCHEDULE } from '@/lib/data';
 import { ptsKey, lookupPts, rollupPts } from '@/lib/scoring';
 import { getBonusPool, getWeekConfig } from '@/lib/utils';
@@ -13,7 +13,7 @@ import { getBonusPool, getWeekConfig } from '@/lib/utils';
 // just the winning driver number; we derive pts directly from
 // currentRace.allStarPicks vs the winner. Saving advances normally.
 function AllStarEntryForm({ state, setState, me, currentRace, onNav, targetWeek, isPastEdit }) {
-  const isAdmin = me.id === ADMIN_ID;
+  const isAdmin = !!me.isAdmin;
   const existing = state.weeklyResults.find(w => w.wk === targetWeek);
   const [winnerNum, setWinnerNum] = useState(
     existing?.allStarWinnerNum != null ? String(existing.allStarWinnerNum) : ''
@@ -246,7 +246,7 @@ export default function EnterResultsScreen({ state, setState, me, onNav, editWee
 
   const { players, schedule, weeklyResults, draftState, draftHistory = [] } = state;
   const currentRace = schedule.find(s => s.wk === targetWeek);
-  const isAdmin = me.id === ADMIN_ID;
+  const isAdmin = !!me.isAdmin;
 
   // All-Star weeks use a totally different scoring model (one pre-locked
   // pick per player, 50-pt bonus if they picked the winner). Branch to

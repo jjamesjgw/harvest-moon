@@ -1,7 +1,7 @@
 'use client';
 import React, { useState } from 'react';
 import { BackChip, CarNum, PlayerBadge, TopBar } from '@/components/ui/primitives';
-import { ADMIN_ID, FB, FD, FI, FL, SERIES, T } from '@/lib/constants';
+import { FB, FD, FI, FL, SERIES, T } from '@/lib/constants';
 import { resolvePickDriver } from '@/lib/utils';
 
 // Small series tag rendered next to a bonus chip ("TRK", "O'R", "HL").
@@ -33,7 +33,7 @@ export default function HistoryScreen({ state, me, onBack, onEdit, onNav }) {
   });
   const collapseAll = () => setExpanded(new Set());
 
-  const isAdmin = me?.id === ADMIN_ID;
+  const isAdmin = !!me?.isAdmin;
   // Clone before sort: Array.prototype.sort mutates in place, and weeklyResults
   // is shared React state — sorting it directly reorders the live array and
   // corrupts any other reader (cron ingest, recap derivations, etc.).
