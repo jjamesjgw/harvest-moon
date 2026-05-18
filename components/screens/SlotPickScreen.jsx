@@ -50,6 +50,34 @@ export default function SlotPickScreen({ state, setState, me, onNav }) {
   const isAdmin = me.id === admin.id;
   const allPicked = idx >= players.length;
 
+  // Slot-pick undo. The most recent picker (or the commissioner) can roll
+  // back their slot selection up until the next person picks — mirrors the
+  // snake-draft undo affordance in DraftScreen. Disabled once all slots are
+  // assigned because the "Draft Starts" countdown begins; the admin Reset
+  // is the escape hatch from there.
+  const lastPicker = idx > 0 ? pickOrder[idx - 1] : null;
+  const canUndo = lastPicker
+    && draftState.phase === 'slot-pick'
+    && draftState.slotAssign[lastPicker.id] != null
+    && (lastPicker.id === me.id || isAdmin);
+
+  const undo = () => {
+    if (!canUndo) return;
+    const targetId = lastPicker.id;
+    setState(s => {
+      const { [targetId]: _removed, ...remainingAssign } = s.draftState.slotAssign;
+      return {
+        ...s,
+        draftState: {
+          ...s.draftState,
+          slotAssign: remainingAssign,
+          slotPickIdx: Math.max(0, s.draftState.slotPickIdx - 1),
+          phase: 'slot-pick',
+        },
+      };
+    });
+  };
+
   const [countdown, setCountdown] = useState(null);
   useEffect(() => {
     if (allPicked && draftState.phase === 'ready' && countdown == null) {
@@ -97,6 +125,15 @@ export default function SlotPickScreen({ state, setState, me, onNav }) {
         </div>
         <div style={{ fontFamily: FD, fontSize:20, fontStyle:'italic', color:'rgba(247,244,237,0.5)' }}>{idx}/{players.length}</div>
       </div>
+      {canUndo && <div style={{ display:'flex', justifyContent:'flex-end', marginTop:10 }}>
+        <button onClick={undo} style={{
+          appearance:'none',
+          background: T.ink, color: T.bg, border:'none',
+          padding:'8px 14px', borderRadius:3, cursor:'pointer',
+          fontFamily: FL, fontSize:10, fontWeight:600,
+          letterSpacing:'0.2em', textTransform:'uppercase',
+        }}>↶ {lastPicker.id === me.id ? 'Undo my slot' : `Undo ${lastPicker.name.split(' ')[0]}'s slot`}</button>
+      </div>}
     </div>
 
     {cfg.bonusSeries.length > 0 && <div style={{ padding:'0 20px 14px' }}>
