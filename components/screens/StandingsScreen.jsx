@@ -228,10 +228,19 @@ function ScrollableWeekTable({ completedWeeks, sorted, me, onNav }) {
   }}>
     <div ref={scrollRef} style={{
       overflowX:'auto', overflowY:'hidden',
+      // touchAction tells the browser horizontal panning is the intent so it
+      // doesn't compete with the parent PullToRefresh / vertical page scroll
+      // for the gesture. WebkitOverflowScrolling adds iOS momentum so a flick
+      // actually carries instead of stopping the instant your finger lifts.
+      // overscrollBehaviorX contains the swipe so it doesn't trigger a
+      // browser back-nav at the edges.
+      touchAction:'pan-x',
+      WebkitOverflowScrolling:'touch',
+      overscrollBehaviorX:'contain',
     }}>
       <div style={{
         display:'grid',
-        gridTemplateColumns:`72px repeat(${completedWeeks.length}, 38px) 56px`,
+        gridTemplateColumns:`88px repeat(${completedWeeks.length}, 52px) 64px`,
         padding:'8px 0', borderBottom:`0.5px solid ${T.line2}`,
         background: T.bg, position:'sticky', top:0,
       }}>
@@ -259,7 +268,7 @@ function ScrollableWeekTable({ completedWeeks, sorted, me, onNav }) {
         const rowBg = isMe ? '#F2ECE1' : T.bg;
         return <div key={p.id} style={{
           display:'grid',
-          gridTemplateColumns:`72px repeat(${completedWeeks.length}, 38px) 56px`,
+          gridTemplateColumns:`88px repeat(${completedWeeks.length}, 52px) 64px`,
           alignItems:'center',
           background: rowBg,
           borderBottom: pi === sorted.length-1 ? 'none' : `0.5px solid ${T.line2}`,
@@ -269,7 +278,7 @@ function ScrollableWeekTable({ completedWeeks, sorted, me, onNav }) {
             position:'sticky', left:0, background: rowBg,
           }}>
             <PlayerBadge player={p} size={18} onClick={() => onNav('team', { playerId: p.id })}/>
-            <span style={{ fontFamily: FD, fontSize:14, fontWeight:600, letterSpacing:'-0.03em' }}>{p.name.slice(0,4)}</span>
+            <span style={{ fontFamily: FD, fontSize:14, fontWeight:600, letterSpacing:'-0.03em' }}>{p.name.slice(0,6)}</span>
           </div>
           {completedWeeks.map(w => {
             const wpts = Object.values(w.pts);
