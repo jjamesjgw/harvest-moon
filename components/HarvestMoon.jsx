@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useLeague } from '@/lib/useLeague';
 import { useGlobalStyles } from '@/lib/globalStyles';
 import {
-  T, FI, ADMIN_ID, ADMIN_PROFILE, CANONICAL_PLAYERS,
+  T, FI, ADMIN_ID, CANONICAL_PLAYERS,
 } from '@/lib/constants';
 import { DEFAULT_DRIVERS, DEFAULT_SCHEDULE } from '@/lib/data';
 import {
@@ -48,7 +48,7 @@ const SCREEN_TO_TAB = {
 // - Always force the canonical 6 players + canonical schedule
 // - Build the merged drivers list (defaults + this week's one-offs)
 // - Override player.color from their favorite driver's primary livery
-// - Set adminId to the dedicated ADMIN account
+// - Set adminId so screens can resolve the commissioner from state
 function migrateState(rawState) {
   if (!rawState) return null;
   const patched = { ...rawState };
@@ -126,9 +126,12 @@ export default function App() {
   const setState = (updater) =>
     setStateRemote(prev => (typeof updater === 'function' ? updater(prev) : updater));
 
-  // Resolve the "me" subject. Admin lives outside of state.players.
+  // Resolve the "me" subject from the canonical player list. The
+  // commissioner is just one of those players (ADMIN_ID), so no special
+  // case is needed here — `isAdmin` checks live in the screens that gate
+  // commissioner actions.
   const me = state && meId
-    ? (meId === ADMIN_ID ? ADMIN_PROFILE : state.players.find(p => p.id === meId))
+    ? state.players.find(p => p.id === meId)
     : null;
 
   // Auto-init a fresh league row if Supabase has no document yet.

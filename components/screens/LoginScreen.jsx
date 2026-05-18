@@ -1,23 +1,20 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
-import { ADMIN_PROFILE, FB, FD, FI, FL, FM, T } from '@/lib/constants';
+import { FB, FD, FI, FL, FM, T } from '@/lib/constants';
 
-// Tile-based login. Six player avatars in a 3×2 grid + a discreet "Admin"
-// link below. Tapping a tile selects that player and reveals the PIN field;
-// the tile gets a copper ring + a soft scale to confirm the selection.
+// Tile-based login. Six player avatars in a 3×2 grid. Tapping a tile selects
+// that player and reveals the PIN field; the tile gets a copper ring + a soft
+// scale to confirm the selection.
 //
 // This replaces the old "type your name" input which was the single biggest
 // recurring friction point in the app — typos, capitalization mismatches,
 // and 5 seconds of typing on every cold-start. With persistent login + this
 // tile picker, the worst-case flow is one tap + four digits.
 //
-// Admin is intentionally a separate flow (not a 7th tile) because it carries
-// different weight than a player account. Admin login swaps the entire
-// player grid for a single centered Admin card, so the PIN appears next to
-// the thing the user just tapped — no scrolling, no spatial confusion.
+// The commissioner is one of the six players (see ADMIN_ID in lib/constants);
+// no separate Admin tile is needed.
 export default function LoginScreen({ onLogin, players }) {
-  const [mode, setMode] = useState('players');           // 'players' | 'admin'
-  const [selectedKey, setSelectedKey] = useState(null);  // lowercased name (player mode only)
+  const [selectedKey, setSelectedKey] = useState(null);  // lowercased name
   const [pin, setPin] = useState('');
   const [err, setErr] = useState(null);
   const pinRef = useRef(null);
@@ -25,7 +22,7 @@ export default function LoginScreen({ onLogin, players }) {
   // Auto-focus PIN whenever a selection is made. The 60ms delay lets the
   // tile's ring/scale transition kick in before the keyboard rises so the
   // focal element doesn't fight the keyboard mid-animation on iOS.
-  const activeKey = mode === 'admin' ? 'admin' : selectedKey;
+  const activeKey = selectedKey;
   useEffect(() => {
     if (!activeKey) return;
     const t = setTimeout(() => pinRef.current?.focus(), 60);
@@ -62,9 +59,7 @@ export default function LoginScreen({ onLogin, players }) {
     if (pin.length !== 4) { setErr('PIN is 4 digits.'); return; }
     setBusy(true);
     try {
-      const account = activeKey === 'admin'
-        ? ADMIN_PROFILE
-        : players.find(p => p.name.toLowerCase() === activeKey);
+      const account = players.find(p => p.name.toLowerCase() === activeKey);
       if (!account) { setErr('Could not load your profile. Try again.'); return; }
 
       const result = await verifyServerSide(activeKey, pin);
@@ -88,22 +83,7 @@ export default function LoginScreen({ onLogin, players }) {
     try { navigator.vibrate?.(15); } catch {}
   };
 
-  const enterAdminMode = () => {
-    setMode('admin');
-    setSelectedKey(null);
-    setPin('');
-    setErr(null);
-    try { navigator.vibrate?.(15); } catch {}
-  };
-
-  const exitAdminMode = () => {
-    setMode('players');
-    setSelectedKey(null);
-    setPin('');
-    setErr(null);
-  };
-
-  const selectedPlayer = mode === 'players' && selectedKey
+  const selectedPlayer = selectedKey
     ? players.find(p => p.name.toLowerCase() === selectedKey)
     : null;
 
@@ -133,19 +113,16 @@ export default function LoginScreen({ onLogin, players }) {
       <div style={{
         fontFamily: FB, fontSize:13, color:'rgba(247,244,237,0.45)',
         marginTop:8, lineHeight:1.5, maxWidth:280, marginLeft:'auto', marginRight:'auto',
-      }}>{mode === 'admin'
-        ? 'Commissioner sign-in.'
-        : 'Tap your tile, then enter your PIN.'}</div>
+      }}>Tap your tile, then enter your PIN.</div>
     </div>
 
-    {/* Picker region — either player grid or admin card */}
+    {/* Picker region — player grid */}
     <div style={{
       width:'100%', maxWidth:360, marginLeft:'auto', marginRight:'auto',
       marginTop:32,
     }}>
-      {mode === 'players' ? (
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:10 }}>
-          {players.map(p => {
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:10 }}>
+        {players.map(p => {
             const key = p.name.toLowerCase();
             const isSel = selectedKey === key;
             return <button key={p.id} onClick={() => selectPlayer(key)} style={{
@@ -183,40 +160,8 @@ export default function LoginScreen({ onLogin, players }) {
             </button>;
           })}
         </div>
-      ) : (
-        // Admin card — single full-width tile in the same family as the player tiles
-        <div style={{
-          background:T.cardGradient,
-          border:`2px solid ${T.hot}`,
-          borderRadius:10,
-          padding:'20px 18px', position:'relative', overflow:'hidden',
-          display:'flex', alignItems:'center', gap:14,
-          boxShadow:'0 8px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.6)',
-        }}>
-          <div style={{
-            position:'absolute', top:0, left:0, right:0, height:3, background: T.ink,
-          }}/>
-          <div style={{
-            width:52, height:52, borderRadius:'50%',
-            background: T.ink, color: T.bg,
-            display:'flex', alignItems:'center', justifyContent:'center',
-            fontFamily: FL, fontWeight:600, fontSize:24, lineHeight:1,
-            boxShadow:'inset 0 1px 0 rgba(255,255,255,0.15)',
-          }}>A</div>
-          <div style={{ flex:1, minWidth:0 }}>
-            <div style={{
-              fontFamily: FL, fontSize:9, fontWeight:600,
-              letterSpacing:'0.24em', textTransform:'uppercase', color: T.hot,
-            }}>Commissioner</div>
-            <div style={{
-              fontFamily: FD, fontSize:22, fontWeight:600, letterSpacing:'-0.03em',
-              color: T.ink, lineHeight:1, marginTop:4,
-            }}>Admin</div>
-          </div>
-        </div>
-      )}
 
-      {/* PIN field — slides into view once a tile/card is active */}
+      {/* PIN field — slides into view once a tile is active */}
       <div style={{
         overflow:'hidden',
         maxHeight: activeKey ? 220 : 0,
@@ -229,7 +174,7 @@ export default function LoginScreen({ onLogin, players }) {
           letterSpacing:'0.28em', textTransform:'uppercase',
           color:'rgba(247,244,237,0.55)', textAlign:'center', marginBottom:10,
         }}>
-          {mode === 'admin' ? 'Admin' : selectedPlayer?.name || ''} · enter PIN
+          {selectedPlayer?.name || ''} · enter PIN
         </div>
         <input ref={pinRef} type="password" inputMode="numeric" value={pin}
           onChange={e => { setPin(e.target.value.replace(/\D/g,'').slice(0,4)); setErr(null); }}
@@ -261,28 +206,10 @@ export default function LoginScreen({ onLogin, players }) {
       </div>
     </div>
 
-    {/* Bottom region — admin toggle + meta line */}
+    {/* Bottom region — meta line */}
     <div style={{ flex:1, minHeight:24 }}/>
     <div style={{ textAlign:'center', flexShrink:0 }}>
-      {mode === 'players' ? (
-        <button onClick={enterAdminMode} style={{
-          appearance:'none', background:'transparent', border:'none',
-          color:'rgba(247,244,237,0.5)', cursor:'pointer',
-          fontFamily: FI, fontStyle:'italic', fontSize:13,
-          padding:'10px 16px',
-          textDecoration:'underline', textDecorationColor:'rgba(247,244,237,0.2)',
-          textUnderlineOffset:'4px',
-        }}>Sign in as Admin →</button>
-      ) : (
-        <button onClick={exitAdminMode} style={{
-          appearance:'none', background:'transparent', border:'none',
-          color:'rgba(247,244,237,0.5)', cursor:'pointer',
-          fontFamily: FI, fontStyle:'italic', fontSize:13,
-          padding:'10px 16px',
-        }}>← Back to player tiles</button>
-      )}
       <div style={{
-        marginTop:8,
         fontFamily: FI, fontStyle:'italic', fontSize:11,
         color:'rgba(247,244,237,0.3)',
       }}>{players.length} members · private league</div>
