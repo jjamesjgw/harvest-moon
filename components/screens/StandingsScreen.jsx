@@ -1,8 +1,136 @@
 'use client';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { BackChip, PlayerBadge, SectionLabel, TopBar, WinsCount } from '@/components/ui/primitives';
 import { FB, FD, FI, FL, T } from '@/lib/constants';
 import { computeStandings } from '@/lib/utils';
+
+// Compute trend signals for the signed-in player. Returns null if there's
+// no completed week yet (nothing to trend on). All three signals are
+// independent — any may be absent (e.g., movement is undefined after one
+// completed week, streak is hidden if it isn't at least 2).
+//   form        — last up-to-3 weekly point totals (oldest → newest)
+//   movement    — season-rank delta: priorRank - currentRank
+//                 (positive means the player CLIMBED; negative means they fell)
+//   streakTop3  — consecutive most-recent weeks ranked 1-3 by weekly pts
+//   lastWk      — wk number of the most recent completed week (for labels)
+function computeMyTrends(state, meId) {
+  if (!meId) return null;
+  const { weeklyResults, players } = state || {};
+  if (!weeklyResults || weeklyResults.length === 0) return null;
+
+  const completed = [...weeklyResults].sort((a, b) => a.wk - b.wk);
+  const lastWk = completed[completed.length - 1].wk;
+  const form = completed.slice(-3).map(w => Number(w.pts?.[meId]) || 0);
+
+  // Season-rank movement. We re-use computeStandings because the ranking
+  // includes ties handled the same way as the main list (descending pts;
+  // identical pts share the same .findIndex result, which is fine —
+  // movement only reports the visible-list delta either way).
+  const rankAt = (throughWk) => {
+    const s = computeStandings(players, weeklyResults, throughWk);
+    const ordered = [...s].sort((a, b) => b.seasonPts - a.seasonPts);
+    const idx = ordered.findIndex(p => p.id === meId);
+    return idx >= 0 ? idx + 1 : null;
+  };
+  const currentRank = rankAt(lastWk);
+  const priorRank = completed.length >= 2
+    ? rankAt(completed[completed.length - 2].wk)
+    : null;
+  const movement = priorRank != null && currentRank != null
+    ? { delta: priorRank - currentRank, currentRank, priorWk: completed[completed.length - 2].wk }
+    : null;
+
+  // Top-3 streak from the most recent week backward. Per-week ranks here
+  // are by WEEKLY pts (not cumulative) so a single hot week still counts.
+  let streakTop3 = 0;
+  for (let i = completed.length - 1; i >= 0; i--) {
+    const w = completed[i];
+    const entries = Object.entries(w.pts || {})
+      .map(([pid, pts]) => ({ pid, pts: Number(pts) || 0 }))
+      .sort((a, b) => b.pts - a.pts);
+    const pos = entries.findIndex(e => e.pid === meId);
+    if (pos >= 0 && pos < 3) streakTop3++;
+    else break;
+  }
+
+  return { form, movement, streakTop3, lastWk };
+}
+
+// ── Trend strip ────────────────────────────────────────────────────
+// Inline subrow rendered under the signed-in user's main standings row.
+// Combines form sparkline + rank-movement chip + top-3 streak chip when
+// each has enough data to be meaningful. Other players keep the single
+// row so the list stays compact.
+function TrendStrip({ trends }) {
+  const { form, movement, streakTop3 } = trends;
+  const showMovement = !!movement;
+  const showStreak = streakTop3 >= 2;
+  if (form.length === 0 && !showMovement && !showStreak) return null;
+  return <div style={{
+    marginTop:10,
+    display:'flex', alignItems:'center', gap:12, flexWrap:'wrap',
+  }}>
+    {form.length > 0 && <FormSparkline values={form}/>}
+    {showMovement && <MovementChip movement={movement}/>}
+    {showStreak && <StreakChip count={streakTop3}/>}
+  </div>;
+}
+
+function FormSparkline({ values }) {
+  const max = Math.max(1, ...values);
+  return <span style={{ display:'inline-flex', alignItems:'center', gap:7 }}>
+    <span style={{
+      fontFamily: FL, fontSize:8, fontWeight:700,
+      letterSpacing:'0.22em', textTransform:'uppercase', color: T.mute,
+    }}>L{values.length}</span>
+    <span style={{ display:'inline-flex', alignItems:'flex-end', gap:2, height:14 }}>
+      {values.map((v, i) => (
+        <span key={i} style={{
+          display:'inline-block', width:5,
+          height:`${Math.max(2, Math.round((v / max) * 14))}px`,
+          background: i === values.length - 1 ? T.ink : T.ink2,
+          borderRadius:1,
+        }}/>
+      ))}
+    </span>
+    <span style={{
+      fontFamily: FB, fontSize:11, fontWeight:500,
+      color: T.ink2, fontVariantNumeric:'tabular-nums', letterSpacing:'-0.01em',
+    }}>{values.join(' · ')}</span>
+  </span>;
+}
+
+function MovementChip({ movement }) {
+  const { delta, priorWk } = movement;
+  const wkLabel = `since wk ${String(priorWk).padStart(2,'0')}`;
+  if (delta === 0) {
+    return <span style={{
+      fontFamily: FB, fontSize:11, fontWeight:500, color: T.mute,
+      fontVariantNumeric:'tabular-nums',
+    }}>— hold {wkLabel}</span>;
+  }
+  const up = delta > 0;
+  return <span style={{
+    display:'inline-flex', alignItems:'center', gap:4,
+    fontFamily: FB, fontSize:11, fontWeight:600,
+    color: up ? T.good : T.danger,
+    fontVariantNumeric:'tabular-nums',
+  }}>
+    <span style={{ fontSize:13, lineHeight:1 }}>{up ? '↑' : '↓'}</span>
+    {Math.abs(delta)}
+    <span style={{ color: T.mute, fontWeight:500 }}>{wkLabel}</span>
+  </span>;
+}
+
+function StreakChip({ count }) {
+  return <span style={{
+    fontFamily: FL, fontSize:8, fontWeight:700,
+    letterSpacing:'0.22em', textTransform:'uppercase',
+    color: T.hot,
+    padding:'3px 7px',
+    border:`1px solid ${T.hot}`, borderRadius:2,
+  }}>Top-3 · {count}w</span>;
+}
 
 // Builds a plain-text version of the standings suitable for pasting into the
 // league group chat. Aligned columns via padEnd. Includes weekly-wins count
@@ -59,6 +187,9 @@ export default function StandingsScreen({ state, me, onNav }) {
   const { players, weeklyResults, currentWeek } = state;
   const standings = computeStandings(players, weeklyResults, currentWeek - 1);
   const sorted = [...standings].sort((a,b) => b.seasonPts - a.seasonPts);
+  // Trend signals for the signed-in player only. Computed once per state
+  // change; rendered as a subrow under the user's main standings row.
+  const myTrends = useMemo(() => computeMyTrends(state, me?.id), [state, me?.id]);
   // Bars normalized to the SPREAD between leader and last place, not to the
   // leader's absolute total. After 11 weeks of cumulative points, every
   // player's bar would be ~70-95% full when normalized to the leader — they
@@ -161,6 +292,7 @@ export default function StandingsScreen({ state, me, onNav }) {
                 transition:'width 380ms cubic-bezier(0.32,0.72,0,1)',
               }}/>
             </div>
+            {isMe && myTrends && <TrendStrip trends={myTrends}/>}
           </div>
           <div style={{ textAlign:'right', minWidth:78 }}>
             <div style={{ fontFamily: FB, fontSize:15, fontWeight:500, fontVariantNumeric:'tabular-nums', letterSpacing:'-0.01em' }}>{p.seasonPts.toLocaleString()}</div>
