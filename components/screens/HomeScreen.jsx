@@ -2,7 +2,7 @@
 import React from 'react';
 import { CarNum, LinkArrow, PlayerBadge, RaceCountdown, SectionLabel, TopBar } from '@/components/ui/primitives';
 import { InstallHint } from '@/components/ui/InstallHint';
-import { ADMIN_ID, FB, FD, FI, FL, FM, T } from '@/lib/constants';
+import { FB, FD, FI, FL, FM, T } from '@/lib/constants';
 import { computeAllDriverStats, computeStandings, getWeekConfig, ordinalSuffix, raceCountdown } from '@/lib/utils';
 import { DEFAULT_DRIVERS } from '@/lib/data';
 import { RACE_QUOTES } from '@/lib/quotes';
@@ -379,7 +379,7 @@ export default function HomeScreen({ state, me, onNav }) {
   // Detect "results due": draft for this week is done but no finalized result yet.
   const thisWeekResult = weeklyResults.find(w => w.wk === currentWeek);
   const resultsDue = draftComplete && !thisWeekResult?.finalized;
-  const isAdmin = me.id === ADMIN_ID;
+  const isAdmin = !!me.isAdmin;
 
   // Live race state — live if green flag is within ~4hr ago. Used to surface
   // a pulsing "LIVE" pill on the hero so the league can feel race day in real time.

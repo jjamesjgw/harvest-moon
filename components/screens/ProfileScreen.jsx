@@ -1,7 +1,7 @@
 'use client';
 import React, { useEffect, useState } from 'react';
 import { BackChip, CarNum, Field, MenuRow, PlayerBadge, SectionLabel, TopBar, WinsCount } from '@/components/ui/primitives';
-import { FB, FD, FI, FL, T } from '@/lib/constants';
+import { ADMIN_ID, FB, FD, FI, FL, T } from '@/lib/constants';
 import { DEFAULT_DRIVERS } from '@/lib/data';
 import { computeStandings } from '@/lib/utils';
 import { disablePush, enablePush, getPushStatus } from '@/lib/push';
@@ -122,7 +122,53 @@ function SaveStatusPill({ status }) {
   }}>{isOk ? '✓ Saved' : 'Saving…'}</span>;
 }
 
-export default function ProfileScreen({ state, setState, me, onBack, saveStatus }) {
+// Segmented toggle that lets the commissioner browse the app as a regular
+// player. When "User" is active, me.isAdmin resolves to false everywhere
+// (computed in HarvestMoon.jsx) so admin-only affordances disappear —
+// useful for navigating the app without risking an accidental tap on a
+// destructive control like Reset Season or Enter Results. The flag lives
+// in localStorage so the choice survives reloads and PWA cold-starts.
+function ViewAsToggle({ viewAsUser, setViewAsUser }) {
+  const opts = [
+    { id: 'admin', label: 'Admin', active: !viewAsUser },
+    { id: 'user',  label: 'User',  active: viewAsUser },
+  ];
+  return <div style={{ padding:'14px 20px 6px' }}>
+    <div style={{
+      display:'flex',
+      border:`1px solid ${T.line}`, borderRadius:3,
+      background: T.card, overflow:'hidden',
+    }}>
+      {opts.map(o => (
+        <button key={o.id}
+          onClick={() => setViewAsUser(o.id === 'user')}
+          style={{
+            appearance:'none', flex:1,
+            background: o.active ? T.ink : 'transparent',
+            color: o.active ? T.bg : T.ink,
+            border:'none', padding:'10px 14px', cursor:'pointer',
+            fontFamily: FL, fontSize:10, fontWeight:600,
+            letterSpacing:'0.22em', textTransform:'uppercase',
+            transition:'background 120ms ease, color 120ms ease',
+          }}>{o.label}</button>
+      ))}
+    </div>
+    <div style={{
+      marginTop:8, fontFamily: FI, fontStyle:'italic', fontSize:12,
+      color: T.mute, lineHeight:1.5,
+    }}>
+      {viewAsUser
+        ? 'Browsing as a regular player. Commissioner controls are hidden — switch back to Admin when you need to enter results or manage the league.'
+        : 'Full commissioner controls visible. Switch to User to browse safely without risking an accidental admin action.'}
+    </div>
+  </div>;
+}
+
+export default function ProfileScreen({ state, setState, me, onBack, saveStatus, viewAsUser, setViewAsUser }) {
+  // Show the view-as-user toggle only for the actual commissioner account,
+  // independent of the current toggle state — we check me.id directly
+  // because me.isAdmin already reflects the toggle.
+  const isCommissioner = me.id === ADMIN_ID;
   const update = (field, val) => {
     setState(s => ({
       ...s,
@@ -209,6 +255,11 @@ export default function ProfileScreen({ state, setState, me, onBack, saveStatus 
 
     <SectionLabel style={{ marginTop:10 }}>Notifications</SectionLabel>
     <PushNotificationsBlock me={me}/>
+
+    {isCommissioner && <>
+      <SectionLabel style={{ marginTop:10 }}>Commissioner Mode</SectionLabel>
+      <ViewAsToggle viewAsUser={viewAsUser} setViewAsUser={setViewAsUser}/>
+    </>}
 
     <div style={{ padding:'12px 20px 8px', fontFamily: FI, fontStyle:'italic', fontSize:11, color: T.mute, textAlign:'center', lineHeight:1.5 }}>
       Changes save automatically as you type.

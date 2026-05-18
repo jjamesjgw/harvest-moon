@@ -21,7 +21,7 @@ export default function SlotPickScreen({ state, setState, me, onNav }) {
 
   const choose = (slot) => {
     if (taken.has(slot)) return;
-    if (!picker || (picker.id !== me.id && me.id !== state.adminId)) return; // on-the-clock player or admin only
+    if (!picker || (picker.id !== me.id && !me.isAdmin)) return; // on-the-clock player or admin only
     const newAssign = { ...draftState.slotAssign, [picker.id]: slot };
     let next = idx + 1;
     let finalAssign = newAssign;
@@ -46,8 +46,7 @@ export default function SlotPickScreen({ state, setState, me, onNav }) {
     }));
   };
 
-  const admin = players.find(p => p.id === state.adminId) || players[0];
-  const isAdmin = me.id === admin.id;
+  const isAdmin = !!me.isAdmin;
   const allPicked = idx >= players.length;
 
   // Slot-pick undo. The most recent picker (or the commissioner) can roll

@@ -119,6 +119,28 @@ export default function App() {
   // when null. Same consume-on-mount pattern as the driver / player stashes.
   const [pendingRecapWk, setPendingRecapWk] = useState(null);
 
+  // Commissioner "view as user" toggle. When the commissioner enables this
+  // from their Profile, isAdmin resolves to false everywhere so admin-only
+  // affordances (Enter Results buttons, Manage Drivers, Reset Season, etc.)
+  // disappear from the UI. The actual session cookie still has isAdmin=true
+  // — this is a UI-only guard so the commissioner can browse like a normal
+  // player without accidentally tapping a destructive control. Persisted in
+  // localStorage so the choice survives reloads. Non-commissioner accounts
+  // never see the toggle and the flag has no effect for them.
+  const [viewAsUser, setViewAsUserState] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    try { return window.localStorage.getItem('harvest-moon:view-as-user') === '1'; }
+    catch { return false; }
+  });
+  const setViewAsUser = (next) => {
+    setViewAsUserState(next);
+    if (typeof window === 'undefined') return;
+    try {
+      if (next) window.localStorage.setItem('harvest-moon:view-as-user', '1');
+      else window.localStorage.removeItem('harvest-moon:view-as-user');
+    } catch {}
+  };
+
   const contentRef = useRef(null);
   const lastTurnRef = useRef(null);
 
@@ -126,12 +148,15 @@ export default function App() {
   const setState = (updater) =>
     setStateRemote(prev => (typeof updater === 'function' ? updater(prev) : updater));
 
-  // Resolve the "me" subject from the canonical player list. The
-  // commissioner is just one of those players (ADMIN_ID), so no special
-  // case is needed here — `isAdmin` checks live in the screens that gate
-  // commissioner actions.
-  const me = state && meId
+  // Resolve the "me" subject from the canonical player list. We patch an
+  // `isAdmin` derived flag onto the object so every screen has a single
+  // source of truth — me.isAdmin is true only when the user is the
+  // commissioner AND has not toggled view-as-user from their Profile.
+  const rawMe = state && meId
     ? state.players.find(p => p.id === meId)
+    : null;
+  const me = rawMe
+    ? { ...rawMe, isAdmin: !viewAsUser && rawMe.id === ADMIN_ID }
     : null;
 
   // Auto-init a fresh league row if Supabase has no document yet.
@@ -486,7 +511,7 @@ export default function App() {
       try { await fetch('/api/auth/logout', { method: 'POST' }); } catch {}
       setMeId(null);
     }}/>,
-    profile:         <ProfileScreen       state={state} setState={setState} me={me} saveStatus={saveStatus} onBack={() => onNav('back')}/>,
+    profile:         <ProfileScreen       state={state} setState={setState} me={me} saveStatus={saveStatus} onBack={() => onNav('back')} viewAsUser={viewAsUser} setViewAsUser={setViewAsUser}/>,
     schedule:        <ScheduleScreen      state={state} onNav={onNav} onBack={() => onNav('back')}/>,
     history:         <HistoryScreen       state={state} me={me} onBack={() => onNav('back')} onNav={onNav} onEdit={(wk) => { setEditingWeek(wk); onNav('edit-results'); }}/>,
     rules:           <RulesScreen         state={state} onBack={() => onNav('back')}/>,
