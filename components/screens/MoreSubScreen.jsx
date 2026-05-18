@@ -10,23 +10,18 @@ import { FB, FD, FI, FL, FM, ROUNDS_PER_WEEK, T } from '@/lib/constants';
 // so the history stack and tab highlight behave naturally.
 export default function MoreSubScreen({ section, state, me, onNav, onSignOut, onReset }) {
   const [resetOpen, setResetOpen] = useState(false);
-  const { schedule, currentWeek, weeklyResults } = state;
+  const { weeklyResults } = state;
   const lastResult = [...weeklyResults].sort((a, b) => b.wk - a.wk)[0];
 
   if (section === 'league') {
     return <div style={{ paddingBottom: 20 }}>
       <TopBar
-        subtitle="Season, drivers, the rules"
+        subtitle="The field and the rules"
         title="League"
         right={<BackChip onClick={() => onNav('back')}/>}
       />
       <SectionLabel>League</SectionLabel>
       <div style={{ padding: '14px 20px 20px' }}>
-        <MenuRow
-          label="Schedule"
-          sub={`${schedule.length} races · Wk ${currentWeek} of ${schedule.length}`}
-          onClick={() => onNav('schedule')}
-        />
         <MenuRow
           label="Drivers"
           sub="League-wide stats & per-driver breakdowns"

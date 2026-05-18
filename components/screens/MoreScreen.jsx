@@ -10,19 +10,24 @@ import { FD, FI, FL, T } from '@/lib/constants';
 // taller cream tile with kicker + display title + italic descriptor so
 // each section gets a readable headline instead of a generic row.
 export default function MoreScreen({ state, me, onNav, onSignOut }) {
-  const { weeklyResults } = state;
+  const { schedule, currentWeek, weeklyResults } = state;
   const lastResult = [...weeklyResults].sort((a, b) => b.wk - a.wk)[0];
   const isAdmin = !!me.isAdmin;
 
   return <div style={{ paddingBottom: 20 }}>
     <TopBar subtitle="League · Settings" title="More"/>
 
-    <SectionLabel>Profile</SectionLabel>
+    <SectionLabel>Quick</SectionLabel>
     <div style={{ padding: '14px 20px 24px' }}>
       <MenuRow
         label="My Profile"
         sub="Nickname, color, favorite driver, notifications"
         onClick={() => onNav('profile')}
+      />
+      <MenuRow
+        label="Schedule"
+        sub={`${schedule.length} races · Wk ${currentWeek} of ${schedule.length}`}
+        onClick={() => onNav('schedule')}
         last
       />
     </div>
@@ -31,9 +36,9 @@ export default function MoreScreen({ state, me, onNav, onSignOut }) {
     <div style={{ padding: '14px 20px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
       <CategoryCard
         kicker="League"
-        count={3}
-        title="The Season"
-        descriptor="Schedule, drivers, and the rules of the road."
+        count={2}
+        title="The Field"
+        descriptor="Drivers and the rules of the road."
         onClick={() => onNav('more-league')}
       />
       <CategoryCard
