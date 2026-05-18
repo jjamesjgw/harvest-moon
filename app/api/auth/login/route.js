@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { ADMIN_ID, ADMIN_PROFILE, CANONICAL_PLAYERS } from '@/lib/constants';
+import { ADMIN_ID, CANONICAL_PLAYERS } from '@/lib/constants';
 import { createSessionCookie } from '@/lib/session';
 
 export const runtime = 'nodejs';
@@ -17,7 +17,6 @@ const supabase = createClient(
 function resolveAccount(rawName) {
   const key = String(rawName || '').trim().toLowerCase();
   if (!key) return null;
-  if (key === ADMIN_ID) return ADMIN_PROFILE;
   return CANONICAL_PLAYERS.find(p => p.name.toLowerCase() === key) || null;
 }
 

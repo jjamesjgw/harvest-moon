@@ -1,7 +1,7 @@
 'use client';
 import React, { useEffect, useState } from 'react';
 import { BackChip, CarNum, Field, MenuRow, PlayerBadge, SectionLabel, TopBar, WinsCount } from '@/components/ui/primitives';
-import { ADMIN_ID, FB, FD, FI, FL, T } from '@/lib/constants';
+import { FB, FD, FI, FL, T } from '@/lib/constants';
 import { DEFAULT_DRIVERS } from '@/lib/data';
 import { computeStandings } from '@/lib/utils';
 import { disablePush, enablePush, getPushStatus } from '@/lib/push';
@@ -123,9 +123,7 @@ function SaveStatusPill({ status }) {
 }
 
 export default function ProfileScreen({ state, setState, me, onBack, saveStatus }) {
-  const isAdmin = me.id === ADMIN_ID;
   const update = (field, val) => {
-    if (isAdmin) return;
     setState(s => ({
       ...s,
       players: s.players.map(p => p.id === me.id
@@ -135,27 +133,7 @@ export default function ProfileScreen({ state, setState, me, onBack, saveStatus 
   };
 
   const { weeklyResults, currentWeek } = state;
-  const mePts = isAdmin ? null : computeStandings(state.players, weeklyResults, currentWeek - 1).find(p => p.id === me.id);
-
-  if (isAdmin) {
-    return <div style={{ paddingBottom:20 }}>
-      <TopBar subtitle="Commissioner controls" title="Admin" right={<BackChip onClick={onBack}/>}/>
-      <div style={{ padding:'0 20px 20px' }}>
-        <div style={{
-          background: T.ink, color: T.bg, borderRadius:4, padding:'22px 20px',
-          display:'flex', alignItems:'center', gap:16,
-        }}>
-          <PlayerBadge player={me} size={64}/>
-          <div style={{ flex:1, minWidth:0 }}>
-            <div style={{ fontFamily: FD, fontSize:28, fontWeight:600, letterSpacing:'-0.03em', lineHeight:1 }}>Admin</div>
-            <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:13, color:'rgba(247,244,237,0.6)', marginTop:8, lineHeight:1.5 }}>
-              You can pick on behalf of any player, reset drafts, manage drivers, enter results, edit past weeks, and reset the season. Backups live in More → Admin Tools.
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>;
-  }
+  const mePts = computeStandings(state.players, weeklyResults, currentWeek - 1).find(p => p.id === me.id);
 
   return <div style={{ paddingBottom:20 }}>
     <TopBar subtitle="Your identity in the league" title="Profile" right={<div style={{ display:'inline-flex', alignItems:'center', gap:8 }}>
