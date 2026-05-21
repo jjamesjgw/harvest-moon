@@ -19,31 +19,39 @@ export default function SlotPickScreen({ state, setState, me, onNav }) {
   const picker = pickOrder[idx];
   const taken = new Set(Object.values(draftState.slotAssign));
 
+  // Slot selection — builds the new assignment + advances slotPickIdx inside
+  // the setState updater (against s.draftState) so a remote realtime push or
+  // a rapid second tap can't be silently overwritten by a stale-closure
+  // snapshot (#44, same class as #40).
   const choose = (slot) => {
     if (taken.has(slot)) return;
     if (!picker || (picker.id !== me.id && !me.isAdmin)) return; // on-the-clock player or admin only
-    const newAssign = { ...draftState.slotAssign, [picker.id]: slot };
-    let next = idx + 1;
-    let finalAssign = newAssign;
-    // When 5 players have picked, auto-assign the last remaining slot to the top-ranked player
-    if (next === players.length - 1) {
-      const used = new Set(Object.values(newAssign));
-      const leftover = Array.from({length: players.length}, (_, i) => i + 1).find(s => !used.has(s));
-      const last = pickOrder[next];
-      if (leftover && last && !newAssign[last.id]) {
-        finalAssign = { ...newAssign, [last.id]: leftover };
-        next = players.length;
+    setState(s => {
+      const baseAssign = s.draftState.slotAssign || {};
+      const newAssign = { ...baseAssign, [picker.id]: slot };
+      const baseIdx = s.draftState.slotPickIdx;
+      let next = baseIdx + 1;
+      let finalAssign = newAssign;
+      // When 5 players have picked, auto-assign the last remaining slot to the top-ranked player
+      if (next === players.length - 1) {
+        const used = new Set(Object.values(newAssign));
+        const leftover = Array.from({length: players.length}, (_, i) => i + 1).find(n => !used.has(n));
+        const last = pickOrder[next];
+        if (leftover && last && !newAssign[last.id]) {
+          finalAssign = { ...newAssign, [last.id]: leftover };
+          next = players.length;
+        }
       }
-    }
-    setState(s => ({
-      ...s,
-      draftState: {
-        ...s.draftState,
-        slotAssign: finalAssign,
-        slotPickIdx: next,
-        phase: next >= players.length ? 'ready' : 'slot-pick',
-      }
-    }));
+      return {
+        ...s,
+        draftState: {
+          ...s.draftState,
+          slotAssign: finalAssign,
+          slotPickIdx: next,
+          phase: next >= players.length ? 'ready' : 'slot-pick',
+        },
+      };
+    });
   };
 
   const isAdmin = !!me.isAdmin;

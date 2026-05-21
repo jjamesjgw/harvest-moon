@@ -181,38 +181,49 @@ export default function DraftScreen({ state, setState, me, onNav }) {
   const activePool = activeSeries === 'Cup' ? cupDrivers : getBonusPool(state, currentWeek, activeSeries);
 
   // Pick action — locks the driver into the current pick slot.
+  // The new pick is appended inside the setState updater (against s.draftState.picks)
+  // so a remote realtime push or a rapid second tap can't be silently overwritten
+  // by a stale-closure snapshot of draftState.picks (#44, same class as #40).
   const pick = (driver) => {
     if (done || !onClock || !canPick) return;
     if (pickedKeys.has(pickKey(activeSeries, driver.num))) return;
     if (remainingForPicker(activeSeries) <= 0) return;
-    const newPicks = [...draftState.picks, {
-      driverNum: driver.num,
-      driverName: driver.name, // snapshot for history when bonus drivers go away later
-      series: activeSeries,
-      playerId: onClock.playerId,
-      round: onClock.round,
-      slot: onClock.slot,
-      at: Date.now(),
-    }];
-    const completing = newPicks.length >= totalDraftPicks;
-    const nextRound = snakeOrder[newPicks.length]?.round || cfg.totalPicks;
-    setState(s => ({
-      ...s,
-      draftState: {
-        ...s.draftState,
-        picks: newPicks,
-        currentRound: nextRound,
-        phase: completing ? 'done' : 'snake',
-      }
-    }));
+    setState(s => {
+      const newPicks = [...s.draftState.picks, {
+        driverNum: driver.num,
+        driverName: driver.name, // snapshot for history when bonus drivers go away later
+        series: activeSeries,
+        playerId: onClock.playerId,
+        round: onClock.round,
+        slot: onClock.slot,
+        at: Date.now(),
+      }];
+      const completing = newPicks.length >= totalDraftPicks;
+      const nextRound = snakeOrder[newPicks.length]?.round || cfg.totalPicks;
+      return {
+        ...s,
+        draftState: {
+          ...s.draftState,
+          picks: newPicks,
+          currentRound: nextRound,
+          phase: completing ? 'done' : 'snake',
+        },
+      };
+    });
   };
 
   const undo = () => {
     if (pickIdx === 0) return;
-    const newPicks = draftState.picks.slice(0, -1);
+    // Build the trimmed picks list from s.draftState.picks inside the updater
+    // so a concurrent remote pick that arrived after this render can't be
+    // silently dropped (#44).
     setState(s => ({
       ...s,
-      draftState: { ...s.draftState, picks: newPicks, phase: 'snake' }
+      draftState: {
+        ...s.draftState,
+        picks: s.draftState.picks.slice(0, -1),
+        phase: 'snake',
+      },
     }));
   };
 
