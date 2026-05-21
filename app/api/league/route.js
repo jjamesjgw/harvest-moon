@@ -88,19 +88,41 @@ export async function POST(req) {
     }
   }
 
-  const { error } = await admin.from('leagues').upsert({
-    id: LEAGUE_ID,
-    state,
-    client_tag,
-    write_id,
-    updated_at: new Date().toISOString(),
+  // CAS upsert via RPC. The function returns a jsonb shape that
+  // distinguishes a successful write from a stale-write rejection
+  // (incoming write_id <= existing row's write_id). Stale writes get
+  // surfaced as 409 so the client can drop its pending blob, pull
+  // fresh, and stop trying to re-apply pre-remote local state. Closes
+  // the #40-class race family at the database boundary — even if a
+  // client's pending POST survives PR #41's debounce-cancel (already
+  // in-flight when realtime arrives), the server refuses to apply it.
+  // See supabase/migrations/20260521010000_league_cas_rpc.sql.
+  const { data: rpcResult, error } = await admin.rpc('upsert_league_with_cas', {
+    p_id: LEAGUE_ID,
+    p_state: state,
+    p_client_tag: client_tag,
+    p_write_id: write_id,
   });
   if (error) {
-    console.error('[league/upsert]', error);
+    console.error('[league/cas]', error);
     return NextResponse.json(
-      { ok: false, error: error.message || 'upsert-failed' },
+      { ok: false, error: error.message || 'cas-failed' },
       { status: 502 },
     );
   }
-  return NextResponse.json({ ok: true, write_id });
+  if (!rpcResult || rpcResult.ok !== true) {
+    // Stale write: a concurrent peer's update with a newer write_id has
+    // already landed. Caller should drop its pending blob and pull fresh;
+    // realtime will eventually deliver the winning row, but the explicit
+    // 409 + server_write_id lets the client converge immediately.
+    return NextResponse.json(
+      {
+        ok: false,
+        error: rpcResult?.error || 'stale-write',
+        server_write_id: rpcResult?.server_write_id ?? null,
+      },
+      { status: 409 },
+    );
+  }
+  return NextResponse.json({ ok: true, write_id: rpcResult.write_id });
 }
