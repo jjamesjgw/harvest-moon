@@ -87,10 +87,9 @@ export default function ManageDriversScreen({ state, setState, me, onBack }) {
   const [bonusAdding, setBonusAdding] = useState(null); // series id when adding to a bonus pool
   const [removeArm, setRemoveArm] = useState(null); // string key 'cup:7' or 'Truck:7'
 
-  const allCupNums = new Set([
-    ...drivers.map(d => d.num),
-    ...Object.values(state.weekDriversExtra || {}).flat().map(d => d.num),
-  ]);
+  // Scope to the current week — part-time drivers from prior weeks
+  // (in weekDriversExtra) must remain re-addable when they run again.
+  const currentCupNums = new Set(drivers.map(d => d.num));
 
   // ── Cup one-offs ──
   const removeCupExtra = (num) => {
@@ -254,7 +253,7 @@ export default function ManageDriversScreen({ state, setState, me, onBack }) {
       ) : (
         <AddDriverForm
           title={`New Cup driver for Wk ${String(currentWeek).padStart(2,'0')}`}
-          existingNums={allCupNums}
+          existingNums={currentCupNums}
           onCancel={() => setAdding(false)}
           onAdd={addCupExtra}
         />
