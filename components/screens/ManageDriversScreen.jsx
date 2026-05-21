@@ -91,6 +91,25 @@ export default function ManageDriversScreen({ state, setState, me, onBack }) {
   // (in weekDriversExtra) must remain re-addable when they run again.
   const currentCupNums = new Set(drivers.map(d => d.num));
 
+  // History of every past one-off Cup driver, dedup'd by car number with
+  // the most-recent entry winning, filtered to numbers not already on
+  // this week's roster. Surfaced as a tap-to-prefill picker in the Add form.
+  const cupHistory = (() => {
+    const byNum = new Map();
+    const weeksDesc = Object.keys(state.weekDriversExtra || {})
+      .map(Number)
+      .filter(n => Number.isFinite(n) && n !== currentWeek)
+      .sort((a, b) => b - a);
+    for (const wk of weeksDesc) {
+      for (const driver of ((state.weekDriversExtra || {})[wk] || [])) {
+        if (byNum.has(driver.num)) continue;
+        if (currentCupNums.has(driver.num)) continue;
+        byNum.set(driver.num, { ...driver, lastSeenWeek: wk });
+      }
+    }
+    return Array.from(byNum.values());
+  })();
+
   // ── Cup one-offs ──
   const removeCupExtra = (num) => {
     const armKey = `Cup:${num}`;
@@ -254,6 +273,7 @@ export default function ManageDriversScreen({ state, setState, me, onBack }) {
         <AddDriverForm
           title={`New Cup driver for Wk ${String(currentWeek).padStart(2,'0')}`}
           existingNums={currentCupNums}
+          history={cupHistory}
           onCancel={() => setAdding(false)}
           onAdd={addCupExtra}
         />
