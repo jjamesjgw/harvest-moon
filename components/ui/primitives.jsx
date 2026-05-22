@@ -268,7 +268,10 @@ const TAB_DEFS = [
 
 export function TabBar({ active, onNav }) {
   return <div style={{
-    position:'sticky', bottom:0, left:0, right:0,
+    // Fixed (not sticky) — iOS Safari can lose the sticky anchor mid-flow
+    // when the URL bar or keyboard transitions the visual viewport, which
+    // leaves the bar floating mid-screen until the next layout pass.
+    position:'fixed', bottom:0, left:0, right:0,
     background:'linear-gradient(180deg, rgba(253,251,245,0.96) 0%, rgba(239,235,224,0.98) 100%)',
     backdropFilter:'blur(20px) saturate(180%)',
     WebkitBackdropFilter:'blur(20px) saturate(180%)',
@@ -385,7 +388,7 @@ export function AppFrame({ children }) {
 
   if (!isWide) {
     return <div style={{
-      minHeight:'100vh', minHeight:'100dvh',
+      minHeight:'100dvh',
       background: T.bg,
       display:'flex', flexDirection:'column',
       paddingLeft:'env(safe-area-inset-left)',

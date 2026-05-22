@@ -533,7 +533,12 @@ export default function App() {
       onRefresh={refresh}
       busy={refreshing}
       disabled={onDraftScreen}
-      style={{ flex:1, overflowY:'auto', background: T.bg }}
+      style={{
+        flex:1, overflowY:'auto', background: T.bg,
+        // Clear the fixed TabBar at the bottom — matches TabBar's
+        // total height (paddingTop + button + paddingBottom).
+        paddingBottom:'calc(76px + env(safe-area-inset-bottom))',
+      }}
     >
       {screens[screen]}
     </PullToRefresh>
