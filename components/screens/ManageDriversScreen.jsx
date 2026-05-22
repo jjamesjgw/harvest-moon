@@ -6,9 +6,10 @@ import { getWeekConfig } from '@/lib/utils';
 
 // Generic "add a driver" form. Used for both Cup one-offs and bonus-series
 // pools. Caller decides what scope to add to via `onAdd(driver)`.
-function AddDriverForm({ onCancel, onAdd, existingNums = new Set(), title }) {
+function AddDriverForm({ onCancel, onAdd, existingNums = new Set(), title, history = [] }) {
   const [d, setD] = useState({ num:'', name:'', team:'', primary:'#14110D', secondary:'#F7F4ED' });
   const [err, setErr] = useState(null);
+  const [expanded, setExpanded] = useState(false);
   const submit = () => {
     setErr(null);
     const n = parseInt(d.num, 10);
@@ -22,6 +23,67 @@ function AddDriverForm({ onCancel, onAdd, existingNums = new Set(), title }) {
   };
   return <div style={{ borderTop:`0.5px solid ${T.line}`, borderBottom:`0.5px solid ${T.line}`, padding:'14px 0', display:'flex', flexDirection:'column', gap:8 }}>
     {title && <div style={{ fontFamily: FL, fontSize:9, fontWeight:600, letterSpacing:'0.22em', textTransform:'uppercase', color: T.hot, marginBottom:2 }}>{title}</div>}
+
+    {history.length > 0 && (() => {
+      const visible = expanded ? history : history.slice(0, 6);
+      const hidden = Math.max(0, history.length - 6);
+      const prefill = (h) => {
+        setD({
+          num: String(h.num),
+          name: h.name,
+          team: h.team === '—' ? '' : h.team,
+          primary: h.primary,
+          secondary: h.secondary,
+        });
+        setErr(null);
+      };
+      return <>
+        <div style={{ fontFamily: FL, fontSize:9, fontWeight:600, letterSpacing:'0.22em', textTransform:'uppercase', color: T.mute, marginTop:2 }}>From past weeks</div>
+        <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+          {visible.map(h => (
+            <button
+              key={h.num}
+              type="button"
+              onClick={() => prefill(h)}
+              style={{
+                appearance:'none',
+                background: T.card,
+                border: `1px solid ${T.line}`,
+                borderRadius: 3,
+                padding: '6px 10px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                cursor: 'pointer',
+                color: T.ink,
+              }}
+            >
+              <CarNum driver={h} size={22}/>
+              <span style={{ fontFamily: FD, fontSize: 13, fontWeight: 600, letterSpacing: '-0.02em' }}>{h.name}</span>
+            </button>
+          ))}
+          {!expanded && hidden > 0 && (
+            <button
+              type="button"
+              onClick={() => setExpanded(true)}
+              style={{
+                appearance:'none',
+                background: T.card,
+                border: `1px solid ${T.line}`,
+                borderRadius: 3,
+                padding: '6px 10px',
+                cursor: 'pointer',
+                fontFamily: FL, fontSize: 10, fontWeight: 600,
+                letterSpacing: '0.18em', textTransform: 'uppercase',
+                color: T.mute,
+              }}
+            >+ {hidden} more</button>
+          )}
+        </div>
+        <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:11, color: T.mute, marginTop:2 }}>or enter a brand-new driver</div>
+      </>;
+    })()}
+
     <div style={{ display:'flex', gap:6 }}>
       <input value={d.num} onChange={e => setD({...d, num: e.target.value})} placeholder="#" maxLength={3}
         style={{ width:54, padding:10, borderRadius:3, border:`1px solid ${T.line}`, background: T.card, fontFamily: FB, fontSize:15, fontWeight:600, textAlign:'center', outline:'none', color: T.ink }}/>
@@ -90,6 +152,25 @@ export default function ManageDriversScreen({ state, setState, me, onBack }) {
   // Scope to the current week — part-time drivers from prior weeks
   // (in weekDriversExtra) must remain re-addable when they run again.
   const currentCupNums = new Set(drivers.map(d => d.num));
+
+  // History of every past one-off Cup driver, dedup'd by car number with
+  // the most-recent entry winning, filtered to numbers not already on
+  // this week's roster. Surfaced as a tap-to-prefill picker in the Add form.
+  const cupHistory = (() => {
+    const byNum = new Map();
+    const weeksDesc = Object.keys(state.weekDriversExtra || {})
+      .map(Number)
+      .filter(n => Number.isFinite(n) && n !== currentWeek)
+      .sort((a, b) => b - a);
+    for (const wk of weeksDesc) {
+      for (const driver of ((state.weekDriversExtra || {})[wk] || [])) {
+        if (byNum.has(driver.num)) continue;
+        if (currentCupNums.has(driver.num)) continue;
+        byNum.set(driver.num, { ...driver, lastSeenWeek: wk });
+      }
+    }
+    return Array.from(byNum.values());
+  })();
 
   // ── Cup one-offs ──
   const removeCupExtra = (num) => {
@@ -254,6 +335,7 @@ export default function ManageDriversScreen({ state, setState, me, onBack }) {
         <AddDriverForm
           title={`New Cup driver for Wk ${String(currentWeek).padStart(2,'0')}`}
           existingNums={currentCupNums}
+          history={cupHistory}
           onCancel={() => setAdding(false)}
           onAdd={addCupExtra}
         />
