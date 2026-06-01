@@ -16,7 +16,15 @@ export function Chip({ children, color, bg, style = {} }) {
   }}>{children}</span>;
 }
 
+// In-memoriam marker: drivers with `memorial: true` (or, as a defensive
+// fallback, #8 specifically — hydrated state predating the flag still works)
+// render a small diagonal black corner band and a partial-saturation filter
+// across the chip. Removing the memorial: delete this helper, the render
+// branch below, and the matching block in lib/shareCard.js drawCarNum.
+const isMemorialDriver = (driver) => driver?.memorial === true || driver?.num === 8;
+
 export function CarNum({ driver, size = 38, onClick }) {
+  const memorial = isMemorialDriver(driver);
   const baseStyle = {
     width:size, height:size, borderRadius:4,
     background: driver.primary, color: driver.secondary,
@@ -25,15 +33,35 @@ export function CarNum({ driver, size = 38, onClick }) {
     letterSpacing:'-0.02em', flexShrink:0,
     border: driver.primary === '#000000' ? '1px solid rgba(255,255,255,0.15)' : 'none',
     boxShadow:'0 1px 0 rgba(0,0,0,0.04)',
+    // position+overflow let the diagonal band clip cleanly at the rounded
+    // corner. box-shadow renders outside the border box and is unaffected
+    // by overflow:hidden, so the subtle drop stays intact.
+    position:'relative', overflow:'hidden',
+    // Partial saturation — colors stay recognizable, but visibly subdued.
+    filter: memorial ? 'saturate(0.55)' : undefined,
   };
+  // Diagonal corner band: a horizontal black bar centered just inside the
+  // top-left corner, rotated -45°. Sized proportional to the chip so it
+  // reads at every scale (small list chips → large hero chip).
+  const band = memorial ? <span aria-hidden style={{
+    position:'absolute',
+    top: size * 0.03,
+    left: -size * 0.25,
+    width: size * 0.7,
+    height: size * 0.14,
+    background:'#000',
+    transform:'rotate(-45deg)',
+    transformOrigin:'center',
+    pointerEvents:'none',
+  }}/> : null;
   if (onClick) {
     return <button
       onClick={(e) => { e.stopPropagation(); onClick(driver); }}
       style={{ ...baseStyle, appearance:'none', padding:0, cursor:'pointer' }}
-      aria-label={`Open ${driver.name || `#${driver.num}`} stats`}
-    >{driver.num}</button>;
+      aria-label={`Open ${driver.name || `#${driver.num}`} stats${memorial ? ', in memoriam' : ''}`}
+    >{driver.num}{band}</button>;
   }
-  return <div style={baseStyle}>{driver.num}</div>;
+  return <div style={baseStyle}>{driver.num}{band}</div>;
 }
 
 export function PlayerBadge({ player, size = 22, style = {}, onClick }) {
