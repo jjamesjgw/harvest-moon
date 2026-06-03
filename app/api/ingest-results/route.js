@@ -32,6 +32,22 @@ if (!SERVICE_ROLE_KEY || SERVICE_ROLE_KEY.length < 50) {
   );
 }
 
+// Module-init auth-secret guard — same fail-loud rationale as the service-
+// role guard above (#50). authorized() accepts a CRON_SECRET bearer token
+// (Vercel cron) OR an INGEST_SECRET header (manual trigger); if BOTH are
+// missing it silently returns false and the route 401s every cron run, with
+// no signal beyond the easily-overlooked cron-history dashboard. Throwing at
+// startup turns that silent ongoing 401 into a loud cold-start failure. If at
+// least one secret is set the route stays operable, matching authorized().
+const CRON_SECRET = process.env.CRON_SECRET;
+const INGEST_SECRET = process.env.INGEST_SECRET;
+if (!CRON_SECRET && !INGEST_SECRET) {
+  throw new Error(
+    '[ingest-results/route] Both CRON_SECRET and INGEST_SECRET are missing — ' +
+      'ingest cannot authenticate any caller.',
+  );
+}
+
 const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
 });
@@ -40,8 +56,8 @@ const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
 // or a manual call (x-ingest-secret: ${INGEST_SECRET}). Two secrets so
 // cron can be revoked without breaking ad-hoc manual triggers.
 function authorized(req) {
-  const cronSecret = process.env.CRON_SECRET;
-  const ingestSecret = process.env.INGEST_SECRET;
+  const cronSecret = CRON_SECRET;
+  const ingestSecret = INGEST_SECRET;
   const auth = req.headers.get('authorization') || '';
   if (cronSecret && auth === `Bearer ${cronSecret}`) return true;
   const given = req.headers.get('x-ingest-secret') || '';
