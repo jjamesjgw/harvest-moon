@@ -34,6 +34,13 @@ yarn-error.log*
 # Superpowers brainstorm session artifacts (mockups, server state)
 .superpowers/
 
+# Claude Flow workspace state + MCP server config (local agent tooling)
+.claude-flow/
+.mcp.json
+
+# Timestamped backups (e.g. .claude.bak-YYYYMMDD-HHMMSS, CLAUDE.md.bak-...)
+*.bak-*
+
 # OS / IDE
 .DS_Store
 Thumbs.db
