@@ -1,0 +1,31 @@
+-- Drop the unrestricted anon INSERT policy on leagues_history (audit #43).
+--
+-- The baseline created:
+--   create policy "anon insert" on public.leagues_history
+--     for insert with check (true);
+-- which lets anyone holding the anon key (it ships in the frontend bundle)
+-- POST arbitrary rows straight into the audit log via PostgREST.
+--
+-- That policy is dead weight. The only legitimate writer is the
+-- leagues_pre_update_guard trigger, which fires on UPDATEs to public.leagues
+-- — and those updates only ever happen under the service-role key (anon has
+-- SELECT-only on leagues), so the trigger's INSERT into leagues_history runs
+-- with rights that bypass RLS entirely. Removing the anon policy therefore
+-- closes the public write hole without touching the real audit path.
+--
+-- We DROP rather than replace with `with check (false)`: a lingering deny
+-- policy reads, in future audits, like direct INSERT was an intentional part
+-- of the model. With no INSERT policy at all, RLS denies anon inserts by
+-- default and the table's posture is unambiguous. (The "anon read" SELECT
+-- policy is intentionally left in place — the client reads history.)
+--
+-- Verify (psql):
+--   begin;
+--     set local role anon;
+--     insert into public.leagues_history (league_id, state, write_id)
+--       values ('harvest-moon', '{}'::jsonb, 1);   -- expect: permission denied
+--   rollback;
+--   -- then exercise a real /api/league write and confirm the trigger still
+--   -- appends an OLD-state row (audit trail intact).
+
+drop policy if exists "anon insert" on public.leagues_history;
