@@ -84,7 +84,7 @@ function migrateState(rawState) {
 export default function App() {
   useGlobalStyles();
 
-  const { state: rawState, setState: setStateRemote, loading, saveStatus, lastError, sessionExpired, retry, refresh, refreshing, fetchSucceeded } = useLeague();
+  const { state: rawState, setState: setStateRemote, resetSeason: resetSeasonRemote, loading, saveStatus, lastError, sessionExpired, retry, refresh, refreshing, fetchSucceeded } = useLeague();
 
   const [screen, setScreen] = useState('home');
   // Persistent login: rehydrate the last-signed-in player ID from localStorage
@@ -391,13 +391,23 @@ export default function App() {
   const activeTab = SCREEN_TO_TAB[screen] || 'home';
 
   const resetSeason = () => {
-    setState(s => ({
-      ...s,
-      currentWeek: 1,
-      weeklyResults: [],
-      draftHistory: [],
-      draftState: { phase:'slot-pick', slotPickIdx:0, slotAssign:{}, currentRound:1, picks:[] },
-    }));
+    // Take a pre-reset snapshot (leagues_snapshots) before clearing the
+    // season, then apply the wipe through the normal write path (#42).
+    // resetSeasonRemote spreads the live state in its updater, so player
+    // customizations (favDriverNum) and schedule survive the reset. It
+    // fail-closes if the snapshot can't be taken — the SaveBanner surfaces
+    // the error and the season is left intact.
+    const preResetWeek = rawState?.currentWeek ?? 0;
+    resetSeasonRemote(
+      s => ({
+        ...s,
+        currentWeek: 1,
+        weeklyResults: [],
+        draftHistory: [],
+        draftState: { phase:'slot-pick', slotPickIdx:0, slotAssign:{}, currentRound:1, picks:[] },
+      }),
+      preResetWeek,
+    );
     historyRef.current = [];
     setScreen('home');
   };
