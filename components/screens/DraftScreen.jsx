@@ -320,7 +320,6 @@ export default function DraftScreen({ state, setState, me, onNav }) {
       onAddDriver={() => onNav('manage-drivers')}
       driverStats={driverStats}
       freshPickKeys={freshPickKeys}
-      onNav={onNav}
     />}
 
     {!done && mode === 'board' && <DraftBoard
@@ -557,7 +556,7 @@ function SeriesTabs({ cfg, picks, pickerId, active, onSelect, bonusPools }) {
 }
 
 // ── Driver pool grid ───────────────────────────────────────────────
-function DraftGrid({ drivers, pickedKeys, activeSeries, draftState, players, onPick, remaining, isEmpty, isAdmin, onAddDriver, driverStats, freshPickKeys, onNav }) {
+function DraftGrid({ drivers, pickedKeys, activeSeries, draftState, players, onPick, remaining, isEmpty, isAdmin, onAddDriver, driverStats, freshPickKeys }) {
   if (isEmpty) {
     const meta = SERIES[activeSeries] || { label: activeSeries };
     return <div style={{ padding:'24px 20px' }}>
@@ -642,17 +641,14 @@ function DraftGrid({ drivers, pickedKeys, activeSeries, draftState, players, onP
               // After the 400ms run completes it stays in place.
               animation: isFresh ? 'hm-tagslide 400ms cubic-bezier(0.32,0.72,0,1) both' : 'none',
             }}>{takenPl.name.slice(0,3)}</div>}
-            {/* Outer card is a <button> for picking; CarNum's onClick form
-                would render button-in-button. Wrap the chip in a non-tabbable
-                span so the stats tap target stays valid HTML. */}
-            {activeSeries === 'Cup' ? (
-              <span
-                onClick={(e) => { e.stopPropagation(); onNav('drivers', { driverNum: d.num }); }}
-                style={{ display:'inline-flex', cursor:'pointer' }}
-              ><CarNum driver={d} size={48}/></span>
-            ) : (
-              <CarNum driver={d} size={48}/>
-            )}
+            {/* The number chip is rendered without its own onClick so the
+                whole card <button> owns the tap — touching anywhere on the
+                square (number included) drafts the driver. We intentionally
+                do NOT link the number out to the driver profile here: users
+                were tapping the number to pick and getting navigated away
+                (or nothing, when the tap landed on the stopPropagation span),
+                so the draft action is the card's only behavior. */}
+            <CarNum driver={d} size={48}/>
             <div style={{
               fontFamily: FD, fontSize:13, fontWeight:600,
               lineHeight:1.1, letterSpacing:'-0.02em',
