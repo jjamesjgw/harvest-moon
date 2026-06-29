@@ -511,6 +511,71 @@ function LatestPicksStrip({ picks, players, freshPickKeys, lookupDriver, onNav }
   );
 }
 
+// ── Bonus-series manual number entry ───────────────────────────────
+// Replaces the pool grid for non-Cup series. The bonus driver is no longer
+// chosen from an admin-curated pool — the player on the clock types the car
+// number. The parent (`onSubmit`) owns range / remaining-allotment /
+// per-series-uniqueness validation and returns an error string to show, or
+// null on success. Non-pickers see a read-only waiting state.
+function BonusNumberEntry({ series, remaining, canPick, pickerName, onSubmit }) {
+  const [val, setVal] = useState('');
+  const [err, setErr] = useState('');
+  const meta = SERIES[series] || { label: series };
+
+  if (!canPick) {
+    return <div style={{ padding:'24px 20px' }}>
+      <div style={{
+        background: T.card, border:`1px solid ${T.line}`, borderRadius:6,
+        padding:'24px 22px', textAlign:'center',
+      }}>
+        <div style={{ fontFamily: FL, fontSize:9, fontWeight:600, letterSpacing:'0.22em', textTransform:'uppercase', color: T.hot }}>{meta.label}</div>
+        <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:14, color: T.mute, marginTop:8, lineHeight:1.5 }}>
+          Waiting on {pickerName || 'the picker'} to enter a {meta.label} car number.
+        </div>
+      </div>
+    </div>;
+  }
+
+  const parsed = parseInt(val, 10);
+  const hasNum = Number.isFinite(parsed);
+  const submit = () => {
+    const error = onSubmit(val);
+    if (error) { setErr(error); return; }
+    setVal(''); setErr('');
+  };
+
+  return <div style={{ padding:'18px 20px 16px' }}>
+    <SectionLabel right={<span style={{ fontFamily: FI, fontStyle:'italic', fontSize:12, textTransform:'none', letterSpacing:'0.01em', color: T.ink }}>{remaining} left from this series</span>}>
+      {meta.label} · Enter Car Number
+    </SectionLabel>
+    <div style={{ display:'flex', gap:8, marginTop:12 }}>
+      <input
+        value={val}
+        onChange={e => { setVal(e.target.value); if (err) setErr(''); }}
+        onKeyDown={e => { if (e.key === 'Enter') submit(); }}
+        placeholder="#"
+        inputMode="numeric"
+        maxLength={3}
+        style={{
+          flex:'0 0 92px', textAlign:'center',
+          fontFamily: FB, fontSize:22, fontWeight:700,
+          padding:'12px 10px', borderRadius:6,
+          border:`1px solid ${T.line}`, background: T.card, color: T.ink,
+        }}
+      />
+      <button onClick={submit} disabled={!hasNum} style={{
+        appearance:'none', flex:1,
+        background: hasNum ? T.ink : T.bg2,
+        color: hasNum ? T.bg : T.mute,
+        border:'none', borderRadius:6, cursor: hasNum ? 'pointer' : 'default',
+        fontFamily: FL, fontSize:11, fontWeight:600,
+        letterSpacing:'0.22em', textTransform:'uppercase',
+      }}>Lock in {hasNum ? `#${parsed}` : 'pick'}</button>
+    </div>
+    {err && <div style={{ marginTop:10, fontFamily: FI, fontStyle:'italic', fontSize:13, color: T.hot }}>{err}</div>}
+  </div>;
+}
+
 // ── Series tab strip ───────────────────────────────────────────────
 // Shown only on weeks with bonus rounds. Each tab displays "Cup 2/4"
 // where 2 is picks-used by the current picker and 4 is their allotment.
