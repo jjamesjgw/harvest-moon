@@ -3,8 +3,8 @@ import React, { useState } from 'react';
 import { BackChip, CarNum, SectionLabel, TopBar } from '@/components/ui/primitives';
 import { FB, FD, FI, FL, T } from '@/lib/constants';
 
-// Generic "add a driver" form. Used for both Cup one-offs and bonus-series
-// pools. Caller decides what scope to add to via `onAdd(driver)`.
+// Generic "add a driver" form for adding one-off Cup drivers for the week.
+// Caller decides what scope to add to via `onAdd(driver)`.
 function AddDriverForm({ onCancel, onAdd, existingNums = new Set(), title, history = [] }) {
   const [d, setD] = useState({ num:'', name:'', team:'', primary:'#14110D', secondary:'#F7F4ED' });
   const [err, setErr] = useState(null);
