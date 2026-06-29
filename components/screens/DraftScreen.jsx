@@ -212,6 +212,21 @@ export default function DraftScreen({ state, setState, me, onNav }) {
     });
   };
 
+  // Manual bonus-series entry. Validates a typed car number against range,
+  // remaining allotment, and per-series uniqueness, then routes through the
+  // same pick() path as a grid tap by handing it a synthetic driver whose
+  // name is the "#N" snapshot. Returns an error string to display, or null
+  // on success.
+  const tryPickBonus = (rawValue) => {
+    if (done || !onClock || !canPick) return 'It is not your pick right now.';
+    const n = parseInt(rawValue, 10);
+    if (!Number.isFinite(n) || n < 0 || n > 999) return 'Car number must be 0–999.';
+    if (remainingForPicker(activeSeries) <= 0) return 'No picks left in this series.';
+    if (pickedKeys.has(pickKey(activeSeries, n))) return 'That number is already taken this week.';
+    pick({ num: n, name: `#${n}` });
+    return null;
+  };
+
   const undo = () => {
     if (pickIdx === 0) return;
     // Build the trimmed picks list from s.draftState.picks inside the updater
@@ -278,7 +293,6 @@ export default function DraftScreen({ state, setState, me, onNav }) {
         pickerId={currentPicker.id}
         active={activeSeries}
         onSelect={setActiveSeries}
-        bonusPools={state.bonusDriversByWeek?.[currentWeek] || {}}
       />}
 
       {!done && <div style={{ padding:'10px 20px 0', display:'flex', gap:6, justifyContent:'flex-end' }}>
@@ -306,7 +320,7 @@ export default function DraftScreen({ state, setState, me, onNav }) {
       </div>}
     </div>
 
-    {!done && mode === 'pick' && <DraftGrid
+    {!done && mode === 'pick' && activeSeries === 'Cup' && <DraftGrid
       drivers={activePool}
       pickedKeys={pickedKeys}
       activeSeries={activeSeries}
@@ -320,6 +334,14 @@ export default function DraftScreen({ state, setState, me, onNav }) {
       onAddDriver={() => onNav('manage-drivers')}
       driverStats={driverStats}
       freshPickKeys={freshPickKeys}
+    />}
+
+    {!done && mode === 'pick' && activeSeries !== 'Cup' && <BonusNumberEntry
+      series={activeSeries}
+      remaining={remainingForPicker(activeSeries)}
+      canPick={!!canPick}
+      pickerName={currentPicker?.name}
+      onSubmit={tryPickBonus}
     />}
 
     {!done && mode === 'board' && <DraftBoard
@@ -495,7 +517,10 @@ function LatestPicksStrip({ picks, players, freshPickKeys, lookupDriver, onNav }
               flex: 1, minWidth: 0,
               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
             }}>
-              {driver?.name || pk.driverName || ''}
+              {(() => {
+                const nm = driver?.name || pk.driverName || '';
+                return nm === `#${pk.driverNum}` ? '' : nm;
+              })()}
             </span>
             {series !== 'Cup' && <span style={{
               fontFamily: FL, fontSize: 8, fontWeight: 600,
@@ -511,11 +536,76 @@ function LatestPicksStrip({ picks, players, freshPickKeys, lookupDriver, onNav }
   );
 }
 
+// ── Bonus-series manual number entry ───────────────────────────────
+// Replaces the pool grid for non-Cup series. The bonus driver is no longer
+// chosen from an admin-curated pool — the player on the clock types the car
+// number. The parent (`onSubmit`) owns range / remaining-allotment /
+// per-series-uniqueness validation and returns an error string to show, or
+// null on success. Non-pickers see a read-only waiting state.
+function BonusNumberEntry({ series, remaining, canPick, pickerName, onSubmit }) {
+  const [val, setVal] = useState('');
+  const [err, setErr] = useState('');
+  const meta = SERIES[series] || { label: series };
+
+  if (!canPick) {
+    return <div style={{ padding:'24px 20px' }}>
+      <div style={{
+        background: T.card, border:`1px solid ${T.line}`, borderRadius:6,
+        padding:'24px 22px', textAlign:'center',
+      }}>
+        <div style={{ fontFamily: FL, fontSize:9, fontWeight:600, letterSpacing:'0.22em', textTransform:'uppercase', color: T.hot }}>{meta.label}</div>
+        <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:14, color: T.mute, marginTop:8, lineHeight:1.5 }}>
+          Waiting on {pickerName || 'the picker'} to enter a {meta.label} car number.
+        </div>
+      </div>
+    </div>;
+  }
+
+  const parsed = parseInt(val, 10);
+  const hasNum = Number.isFinite(parsed);
+  const submit = () => {
+    const error = onSubmit(val);
+    if (error) { setErr(error); return; }
+    setVal(''); setErr('');
+  };
+
+  return <div style={{ padding:'18px 20px 16px' }}>
+    <SectionLabel right={<span style={{ fontFamily: FI, fontStyle:'italic', fontSize:12, textTransform:'none', letterSpacing:'0.01em', color: T.ink }}>{remaining} left from this series</span>}>
+      {meta.label} · Enter Car Number
+    </SectionLabel>
+    <div style={{ display:'flex', gap:8, marginTop:12 }}>
+      <input
+        value={val}
+        onChange={e => { setVal(e.target.value); if (err) setErr(''); }}
+        onKeyDown={e => { if (e.key === 'Enter') submit(); }}
+        placeholder="#"
+        inputMode="numeric"
+        maxLength={3}
+        style={{
+          flex:'0 0 92px', textAlign:'center',
+          fontFamily: FB, fontSize:22, fontWeight:700,
+          padding:'12px 10px', borderRadius:6,
+          border:`1px solid ${T.line}`, background: T.card, color: T.ink,
+        }}
+      />
+      <button onClick={submit} disabled={!hasNum} style={{
+        appearance:'none', flex:1,
+        background: hasNum ? T.ink : T.bg2,
+        color: hasNum ? T.bg : T.mute,
+        border:'none', borderRadius:6, cursor: hasNum ? 'pointer' : 'default',
+        fontFamily: FL, fontSize:11, fontWeight:600,
+        letterSpacing:'0.22em', textTransform:'uppercase',
+      }}>Lock in {hasNum ? `#${parsed}` : 'pick'}</button>
+    </div>
+    {err && <div style={{ marginTop:10, fontFamily: FI, fontStyle:'italic', fontSize:13, color: T.hot }}>{err}</div>}
+  </div>;
+}
+
 // ── Series tab strip ───────────────────────────────────────────────
 // Shown only on weeks with bonus rounds. Each tab displays "Cup 2/4"
 // where 2 is picks-used by the current picker and 4 is their allotment.
-// Tabs that are maxed are disabled. Tabs whose pool is empty get a hint.
-function SeriesTabs({ cfg, picks, pickerId, active, onSelect, bonusPools }) {
+// Tabs that are maxed (allotment used up) are disabled.
+function SeriesTabs({ cfg, picks, pickerId, active, onSelect }) {
   return <div style={{ padding:'10px 20px 0' }}>
     <div style={{
       display:'flex', gap:6, overflowX:'auto', paddingBottom:6,
@@ -523,9 +613,7 @@ function SeriesTabs({ cfg, picks, pickerId, active, onSelect, bonusPools }) {
       {Object.entries(cfg.allotments).map(([series, max]) => {
         const used = countPicksBySeries(picks, pickerId, series);
         const remaining = max - used;
-        const pool = series === 'Cup' ? null : (bonusPools[series] || []);
-        const poolEmpty = pool && pool.length === 0;
-        const disabled = remaining <= 0 || poolEmpty;
+        const disabled = remaining <= 0;
         const isActive = active === series;
         const meta = SERIES[series] || { label: series, short: series.slice(0,3).toUpperCase() };
         return <button
@@ -545,7 +633,6 @@ function SeriesTabs({ cfg, picks, pickerId, active, onSelect, bonusPools }) {
             display:'flex', alignItems:'center', gap:8,
             opacity: disabled ? 0.55 : 1,
           }}
-          title={poolEmpty ? 'Admin has not added drivers for this series yet' : undefined}
         >
           <span>{meta.label}</span>
           <span style={{ fontFamily: FB, fontSize:11, fontWeight:600, fontVariantNumeric:'tabular-nums', letterSpacing:'-0.01em', color: isActive ? T.hot : T.mute }}>{used}/{max}</span>
@@ -857,6 +944,14 @@ function DraftBoard({ snakeOrder, picks, players, slotAssign, totalRounds, curre
                       <div style={{
                         fontFamily: FD, fontSize: 9, color: T.mute,
                       }}>—</div>
+                      {series !== 'Cup' && <div style={{
+                        position: 'absolute', bottom: 1, left: 2,
+                        fontFamily: FL, fontSize: 6, fontWeight: 700,
+                        color: T.hot,
+                        letterSpacing: '0.15em', textTransform: 'uppercase',
+                      }}>
+                        {SERIES[series]?.short || series.slice(0, 3).toUpperCase()}
+                      </div>}
                     </>
                   ) : (
                     <span style={{
