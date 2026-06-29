@@ -604,7 +604,7 @@ function BonusNumberEntry({ series, remaining, canPick, pickerName, onSubmit }) 
 // ── Series tab strip ───────────────────────────────────────────────
 // Shown only on weeks with bonus rounds. Each tab displays "Cup 2/4"
 // where 2 is picks-used by the current picker and 4 is their allotment.
-// Tabs that are maxed are disabled. Tabs whose pool is empty get a hint.
+// Tabs that are maxed (allotment used up) are disabled.
 function SeriesTabs({ cfg, picks, pickerId, active, onSelect }) {
   return <div style={{ padding:'10px 20px 0' }}>
     <div style={{
