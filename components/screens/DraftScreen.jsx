@@ -293,7 +293,6 @@ export default function DraftScreen({ state, setState, me, onNav }) {
         pickerId={currentPicker.id}
         active={activeSeries}
         onSelect={setActiveSeries}
-        bonusPools={state.bonusDriversByWeek?.[currentWeek] || {}}
       />}
 
       {!done && <div style={{ padding:'10px 20px 0', display:'flex', gap:6, justifyContent:'flex-end' }}>
@@ -518,7 +517,10 @@ function LatestPicksStrip({ picks, players, freshPickKeys, lookupDriver, onNav }
               flex: 1, minWidth: 0,
               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
             }}>
-              {driver?.name || pk.driverName || ''}
+              {(() => {
+                const nm = driver?.name || pk.driverName || '';
+                return nm === `#${pk.driverNum}` ? '' : nm;
+              })()}
             </span>
             {series !== 'Cup' && <span style={{
               fontFamily: FL, fontSize: 8, fontWeight: 600,
@@ -603,7 +605,7 @@ function BonusNumberEntry({ series, remaining, canPick, pickerName, onSubmit }) 
 // Shown only on weeks with bonus rounds. Each tab displays "Cup 2/4"
 // where 2 is picks-used by the current picker and 4 is their allotment.
 // Tabs that are maxed are disabled. Tabs whose pool is empty get a hint.
-function SeriesTabs({ cfg, picks, pickerId, active, onSelect, bonusPools }) {
+function SeriesTabs({ cfg, picks, pickerId, active, onSelect }) {
   return <div style={{ padding:'10px 20px 0' }}>
     <div style={{
       display:'flex', gap:6, overflowX:'auto', paddingBottom:6,
@@ -611,9 +613,7 @@ function SeriesTabs({ cfg, picks, pickerId, active, onSelect, bonusPools }) {
       {Object.entries(cfg.allotments).map(([series, max]) => {
         const used = countPicksBySeries(picks, pickerId, series);
         const remaining = max - used;
-        const pool = series === 'Cup' ? null : (bonusPools[series] || []);
-        const poolEmpty = pool && pool.length === 0;
-        const disabled = remaining <= 0 || poolEmpty;
+        const disabled = remaining <= 0;
         const isActive = active === series;
         const meta = SERIES[series] || { label: series, short: series.slice(0,3).toUpperCase() };
         return <button
@@ -633,7 +633,6 @@ function SeriesTabs({ cfg, picks, pickerId, active, onSelect, bonusPools }) {
             display:'flex', alignItems:'center', gap:8,
             opacity: disabled ? 0.55 : 1,
           }}
-          title={poolEmpty ? 'Admin has not added drivers for this series yet' : undefined}
         >
           <span>{meta.label}</span>
           <span style={{ fontFamily: FB, fontSize:11, fontWeight:600, fontVariantNumeric:'tabular-nums', letterSpacing:'-0.01em', color: isActive ? T.hot : T.mute }}>{used}/{max}</span>
