@@ -212,6 +212,21 @@ export default function DraftScreen({ state, setState, me, onNav }) {
     });
   };
 
+  // Manual bonus-series entry. Validates a typed car number against range,
+  // remaining allotment, and per-series uniqueness, then routes through the
+  // same pick() path as a grid tap by handing it a synthetic driver whose
+  // name is the "#N" snapshot. Returns an error string to display, or null
+  // on success.
+  const tryPickBonus = (rawValue) => {
+    if (done || !onClock || !canPick) return 'It is not your pick right now.';
+    const n = parseInt(rawValue, 10);
+    if (!Number.isFinite(n) || n < 0 || n > 999) return 'Car number must be 0–999.';
+    if (remainingForPicker(activeSeries) <= 0) return 'No picks left in this series.';
+    if (pickedKeys.has(pickKey(activeSeries, n))) return 'That number is already taken this week.';
+    pick({ num: n, name: `#${n}` });
+    return null;
+  };
+
   const undo = () => {
     if (pickIdx === 0) return;
     // Build the trimmed picks list from s.draftState.picks inside the updater
