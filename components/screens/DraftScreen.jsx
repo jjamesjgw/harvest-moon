@@ -321,7 +321,7 @@ export default function DraftScreen({ state, setState, me, onNav }) {
       </div>}
     </div>
 
-    {!done && mode === 'pick' && <DraftGrid
+    {!done && mode === 'pick' && activeSeries === 'Cup' && <DraftGrid
       drivers={activePool}
       pickedKeys={pickedKeys}
       activeSeries={activeSeries}
@@ -335,6 +335,14 @@ export default function DraftScreen({ state, setState, me, onNav }) {
       onAddDriver={() => onNav('manage-drivers')}
       driverStats={driverStats}
       freshPickKeys={freshPickKeys}
+    />}
+
+    {!done && mode === 'pick' && activeSeries !== 'Cup' && <BonusNumberEntry
+      series={activeSeries}
+      remaining={remainingForPicker(activeSeries)}
+      canPick={!!canPick}
+      pickerName={currentPicker?.name}
+      onSubmit={tryPickBonus}
     />}
 
     {!done && mode === 'board' && <DraftBoard
