@@ -944,6 +944,14 @@ function DraftBoard({ snakeOrder, picks, players, slotAssign, totalRounds, curre
                       <div style={{
                         fontFamily: FD, fontSize: 9, color: T.mute,
                       }}>—</div>
+                      {series !== 'Cup' && <div style={{
+                        position: 'absolute', bottom: 1, left: 2,
+                        fontFamily: FL, fontSize: 6, fontWeight: 700,
+                        color: T.hot,
+                        letterSpacing: '0.15em', textTransform: 'uppercase',
+                      }}>
+                        {SERIES[series]?.short || series.slice(0, 3).toUpperCase()}
+                      </div>}
                     </>
                   ) : (
                     <span style={{
