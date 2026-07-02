@@ -69,61 +69,42 @@ function authorized(req) {
   return false;
 }
 
+// Does week `wk` already have Cup driverPoints (auto-ingested or manually
+// entered)? Used both to pick a target and to re-check, against freshly-read
+// state, that the target is still un-ingested before each write attempt.
+function hasCupData(state, wk) {
+  const ex = (state.weeklyResults || []).find(w => w.wk === wk);
+  if (!ex) return false;
+  const dp = ex.driverPoints || {};
+  return Object.keys(dp).some(k => k.startsWith('Cup:') || /^\d+$/.test(k));
+}
+
 // Pick the wk whose race ended ≥4h ago and which doesn't yet have any Cup
-// driverPoints (auto-ingested or manually entered). If multiple qualify,
-// take the most recently completed.
+// driverPoints. If multiple qualify, take the most recently completed.
 function findTargetRace(state, now) {
-  const { schedule = [], weeklyResults = [] } = state;
+  const { schedule = [] } = state;
   const year = now.getFullYear();
   const fourHours = 4 * 60 * 60 * 1000;
-  const hasCupData = (wk) => {
-    const ex = weeklyResults.find(w => w.wk === wk);
-    if (!ex) return false;
-    const dp = ex.driverPoints || {};
-    return Object.keys(dp).some(k => k.startsWith('Cup:') || /^\d+$/.test(k));
-  };
   let best = null;
   for (const r of schedule) {
     const start = parseRaceTime(r.date, r.time, year);
     if (!start) continue;
     if ((now - start) < fourHours) continue;
-    if (hasCupData(r.wk)) continue;
+    if (hasCupData(state, r.wk)) continue;
     if (!best || start > best.start) best = { ...r, start };
   }
   return best;
 }
 
-async function handle(req) {
-  if (!authorized(req)) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-
-  const { data, error } = await admin
-    .from('leagues')
-    .select('state')
-    .eq('id', LEAGUE_ID)
-    .maybeSingle();
-  if (error) {
-    console.error('[ingest/select]', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-  if (!data?.state) return NextResponse.json({ skipped: 'no-league-row' });
-
-  const state = data.state;
-  const now = new Date();
-  const target = findTargetRace(state, now);
-  if (!target) return NextResponse.json({ skipped: 'no-race-due' });
-
-  const override = state.scheduleOverrides?.[target.wk]?.wikiSlug;
-  const slug = deriveWikiSlug(target.raceName, now.getFullYear(), override, target.track);
-
-  const fetched = await fetchArticleHtml(slug);
-  if (!fetched.ok) return NextResponse.json({ skipped: fetched.reason, wk: target.wk, slug });
-  const parsed = parseFinalResults(fetched.html);
-  if (!parsed.final) return NextResponse.json({ skipped: parsed.reason, wk: target.wk, slug });
-
-  // Preserve any bonuses / overrides the admin may have already entered for
-  // this week. Replace Cup driverPoints with fetched values.
+// Merge the parsed race results for `target.wk` into `state`, returning the
+// new full-state document plus the recomputed pts and Cup-driver count.
+// Pure: reads only its arguments, so it can be re-run against a freshly-read
+// state on a write-conflict retry without re-fetching Wikipedia. Bonuses and
+// overrides are read from the CURRENT row's week (so an admin's concurrent
+// bonus edit is honoured on retry rather than reverted to the first read).
+function buildIngestState(state, target, parsedResults, now, slug) {
   const existing = state.weeklyResults?.find(w => w.wk === target.wk) || {};
-  const cup = buildCupDriverPoints(parsed.results);
+  const cup = buildCupDriverPoints(parsedResults);
   const driverPoints = { ...(existing.driverPoints || {}), ...cup };
 
   const picks = state.draftHistory?.find(h => h.wk === target.wk)?.picks
@@ -154,34 +135,123 @@ async function handle(req) {
     ],
   };
 
-  const writeId = Math.floor(Date.now() / 1000);
-  // Snapshot before the upsert so a bad parse or scoring bug can be rolled
-  // back from leagues_snapshots. withSnapshot throws if the snapshot fails,
-  // so we never overwrite state without a recovery point.
-  const { error: writeErr } = await withSnapshot(`pre-ingest:wk${target.wk}`, () =>
-    admin.from('leagues').upsert({
-      id: LEAGUE_ID,
-      state: newState,
-      client_tag: 'ingest-cron',
-      write_id: writeId,
-      updated_at: now.toISOString(),
-    }),
-  );
-  if (writeErr) {
-    console.error('[ingest/upsert]', writeErr);
-    return NextResponse.json({ error: writeErr.message }, { status: 500 });
+  return { newState, pts, cupCount: Object.keys(cup).length };
+}
+
+// How many times to re-read + re-merge + re-attempt the conditional write when
+// a concurrent user save lands in our read→write window. Writes in a 6-user
+// league are rare and brief, so this converges on attempt 2 in practice; the
+// cron's own 4-runs-per-race cadence is the backstop if we ever exhaust it.
+const MAX_WRITE_ATTEMPTS = 4;
+
+async function handle(req) {
+  if (!authorized(req)) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+
+  // First read: pick the target race off the current row. We also capture
+  // write_id here as the compare-and-swap baseline for the write below.
+  const { data, error } = await admin
+    .from('leagues')
+    .select('state, write_id')
+    .eq('id', LEAGUE_ID)
+    .maybeSingle();
+  if (error) {
+    console.error('[ingest/select]', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+  if (!data?.state) return NextResponse.json({ skipped: 'no-league-row' });
+
+  const now = new Date();
+  const target = findTargetRace(data.state, now);
+  if (!target) return NextResponse.json({ skipped: 'no-race-due' });
+
+  const override = data.state.scheduleOverrides?.[target.wk]?.wikiSlug;
+  // target.track is required for the name-collision disambiguation added in
+  // #79 — two 2026 races share the name "Cook Out 400", so the track is what
+  // picks the right Wikipedia article. Dropping this arg silently reintroduces
+  // the wk-25 Richmond bug.
+  const slug = deriveWikiSlug(target.raceName, now.getFullYear(), override, target.track);
+
+  // Slow external fetch happens exactly once, up front. The parsed results are
+  // reused across any conditional-write retries below.
+  const fetched = await fetchArticleHtml(slug);
+  if (!fetched.ok) return NextResponse.json({ skipped: fetched.reason, wk: target.wk, slug });
+  const parsed = parseFinalResults(fetched.html);
+  if (!parsed.final) return NextResponse.json({ skipped: parsed.reason, wk: target.wk, slug });
+
+  // Conditional-write loop. Each attempt rebuilds the new document from the
+  // FRESHEST read of the row and applies it only if the row is unchanged since
+  // that read (upsert_league_if_unchanged). This closes the lost-update window
+  // where a user save via /api/league lands between our read and our write:
+  // instead of the old unconditional upsert clobbering it with a stale
+  // snapshot, we detect the change, re-read, re-merge the parsed results, and
+  // retry. write_id is milliseconds (Date.now()) to match client writes so the
+  // row's write_id stays in the same magnitude as the CAS RPC expects.
+  let readState = data.state;
+  let expectedWriteId = data.write_id ?? null;
+
+  for (let attempt = 1; attempt <= MAX_WRITE_ATTEMPTS; attempt++) {
+    // Re-validate against the state we're about to merge into: if a manual
+    // entry (or a prior attempt) already populated this week, there's nothing
+    // left to ingest.
+    if (hasCupData(readState, target.wk)) {
+      return NextResponse.json({ skipped: 'already-ingested', wk: target.wk, slug });
+    }
+
+    const built = buildIngestState(readState, target, parsed.results, now, slug);
+    const writeId = Date.now();
+
+    // Snapshot before the write so a bad parse or scoring bug can be rolled
+    // back from leagues_snapshots. withSnapshot throws if the snapshot fails,
+    // so we never overwrite state without a recovery point.
+    const { data: rpcResult, error: writeErr } = await withSnapshot(
+      `pre-ingest:wk${target.wk}`,
+      () => admin.rpc('upsert_league_if_unchanged', {
+        p_id: LEAGUE_ID,
+        p_state: built.newState,
+        p_client_tag: 'ingest-cron',
+        p_write_id: writeId,
+        p_expected_write_id: expectedWriteId,
+      }),
+    );
+    if (writeErr) {
+      console.error('[ingest/cas]', writeErr);
+      return NextResponse.json({ error: writeErr.message }, { status: 500 });
+    }
+
+    if (rpcResult?.ok === true) {
+      // The leagues_notify trigger fires on this update and pushes a
+      // "Week N results posted" notification via /api/notify.
+      return NextResponse.json({
+        ok: true,
+        wk: target.wk,
+        track: target.track,
+        slug,
+        cupDrivers: built.cupCount,
+        pts: built.pts,
+        attempts: attempt,
+      });
+    }
+
+    // Row changed under us (a concurrent user save) or vanished. Re-read the
+    // fresh row and retry the merge against it.
+    const reread = await admin
+      .from('leagues')
+      .select('state, write_id')
+      .eq('id', LEAGUE_ID)
+      .maybeSingle();
+    if (reread.error) {
+      console.error('[ingest/reselect]', reread.error);
+      return NextResponse.json({ error: reread.error.message }, { status: 500 });
+    }
+    if (!reread.data?.state) return NextResponse.json({ skipped: 'no-league-row' });
+    readState = reread.data.state;
+    expectedWriteId = reread.data.write_id ?? null;
   }
 
-  // The leagues_notify trigger fires on this upsert and pushes a
-  // "Week N results posted" notification via /api/notify.
-  return NextResponse.json({
-    ok: true,
-    wk: target.wk,
-    track: target.track,
-    slug,
-    cupDrivers: Object.keys(cup).length,
-    pts,
-  });
+  // Exhausted attempts against a persistent concurrent writer. Bail without
+  // writing; the next scheduled cron run retries (hasCupData stays false).
+  console.warn(`[ingest] write contended for wk${target.wk} after ${MAX_WRITE_ATTEMPTS} attempts`);
+  return NextResponse.json({ skipped: 'write-contended', wk: target.wk, slug }, { status: 409 });
 }
 
 export async function GET(req)  { return handle(req); }
