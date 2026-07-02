@@ -18,7 +18,7 @@ function SeriesTag({ series }) {
 }
 
 export default function RecapScreen({ state, onNav, viewWk, onConsumeViewWk }) {
-  const { players, weeklyResults, draftHistory = [] } = state;
+  const { players, weeklyResults, draftHistory = [], currentWeek } = state;
 
   // Consume the deep-link stash on mount so back/forward navigation can't
   // accidentally re-open the same week.
@@ -27,7 +27,19 @@ export default function RecapScreen({ state, onNav, viewWk, onConsumeViewWk }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewWk]);
 
-  if (weeklyResults.length === 0) {
+  // A week is recappable only once the season has moved past it
+  // (wk ≤ currentWeek-1). The current week's row is written live during
+  // results entry (every keystroke) and by the ingest cron before Save &
+  // Advance, so it isn't final — it must never be the fallback recap or get
+  // labeled "Final". Mirrors HomeScreen's prevWk convention and
+  // computeStandings' throughWeek filter.
+  const finalWeeks = weeklyResults.filter(w => w.wk <= currentWeek - 1);
+  // viewWk lets Home (or any caller) deep-link to a specific week. Falls back
+  // to the most-recent final week when null.
+  const explicit = viewWk != null ? weeklyResults.find(w => w.wk === viewWk) : null;
+  const last = explicit || finalWeeks.slice().sort((a,b) => b.wk - a.wk)[0];
+
+  if (!last) {
     return <div style={{ paddingBottom:20 }}>
       <TopBar title="Race Recap" right={<BackChip onClick={() => onNav('back')}/>}/>
       <div style={{ padding:'40px 28px', textAlign:'center' }}>
@@ -38,10 +50,6 @@ export default function RecapScreen({ state, onNav, viewWk, onConsumeViewWk }) {
     </div>;
   }
 
-  // viewWk lets Home (or any caller) deep-link to a specific finalized
-  // week. Falls back to the most-recent finalized week when null.
-  const explicit = viewWk != null ? weeklyResults.find(w => w.wk === viewWk) : null;
-  const last = explicit || weeklyResults.slice().sort((a,b) => b.wk - a.wk)[0];
   const sortedRes = players.map(p => ({ ...p, pts: last.pts[p.id] || 0 })).sort((a,b) => b.pts - a.pts);
   const hist = draftHistory.find(h => h.wk === last.wk);
   const raceMeta = (state.schedule || []).find(s => s.wk === last.wk);

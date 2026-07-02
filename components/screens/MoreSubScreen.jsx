@@ -10,8 +10,13 @@ import { FB, FD, FI, FL, FM, ROUNDS_PER_WEEK, T } from '@/lib/constants';
 // so the history stack and tab highlight behave naturally.
 export default function MoreSubScreen({ section, state, me, onNav, onSignOut, onReset }) {
   const [resetOpen, setResetOpen] = useState(false);
-  const { weeklyResults } = state;
-  const lastResult = [...weeklyResults].sort((a, b) => b.wk - a.wk)[0];
+  const { weeklyResults, currentWeek } = state;
+  // Only weeks the season has moved past (wk ≤ currentWeek-1) count as the
+  // "last result" — the current week's live/ingested row isn't final yet, so
+  // labeling it here would disagree with the recap it links to.
+  const lastResult = [...weeklyResults]
+    .filter(w => w.wk <= currentWeek - 1)
+    .sort((a, b) => b.wk - a.wk)[0];
 
   if (section === 'league') {
     return <div style={{ paddingBottom: 20 }}>

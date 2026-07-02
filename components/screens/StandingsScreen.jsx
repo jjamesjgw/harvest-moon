@@ -14,12 +14,12 @@ import { computeStandings } from '@/lib/utils';
 //                 (positive means the player CLIMBED; negative means they fell)
 //   streakTop3  — consecutive most-recent weeks ranked 1-3 by weekly pts
 //   lastWk      — wk number of the most recent completed week (for labels)
-function computePlayerTrends(state, playerId) {
+function computePlayerTrends(completedResults, players, playerId) {
   if (!playerId) return null;
-  const { weeklyResults, players } = state || {};
-  if (!weeklyResults || weeklyResults.length === 0) return null;
+  if (!completedResults || completedResults.length === 0) return null;
+  const weeklyResults = completedResults;
 
-  const completed = [...weeklyResults].sort((a, b) => a.wk - b.wk);
+  const completed = [...completedResults].sort((a, b) => a.wk - b.wk);
   const lastWk = completed[completed.length - 1].wk;
   const form = completed.slice(-3).map(w => Number(w.pts?.[playerId]) || 0);
   const formAvg = form.length
@@ -192,12 +192,21 @@ export default function StandingsScreen({ state, me, onNav }) {
   const { players, weeklyResults, currentWeek } = state;
   const standings = computeStandings(players, weeklyResults, currentWeek - 1);
   const sorted = [...standings].sort((a,b) => b.seasonPts - a.seasonPts);
+  // Only weeks that count toward the Total (wk ≤ currentWeek-1) are treated as
+  // completed. The current week's row — written live by EnterResultsScreen on
+  // every keystroke, or by the ingest cron before Save & Advance — carries
+  // wk === currentWeek and must NOT appear as a By-Week column or feed the
+  // trend signals, or its half-entered points would show in cells that don't
+  // sum to the Total (which excludes it) and skew form/movement/streak. This
+  // matches computeStandings' own `wk <= throughWeek` filter exactly, keeping
+  // the columns and the Total in lockstep.
+  const completedResults = weeklyResults.filter(w => w.wk <= currentWeek - 1);
   // Trend signals computed per player. Keyed by id so the row map can do a
   // plain lookup. Re-runs whenever state changes — 6 players × ~14 weeks is
   // a few thousand ops, negligible.
   const trendsById = useMemo(() => {
     const map = {};
-    sorted.forEach(p => { map[p.id] = computePlayerTrends(state, p.id); });
+    sorted.forEach(p => { map[p.id] = computePlayerTrends(completedResults, players, p.id); });
     return map;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
@@ -213,7 +222,7 @@ export default function StandingsScreen({ state, me, onNav }) {
   const spread = Math.max(1, maxPts - minPts);
   // Most recent week on the left so the table opens to current-season context
   // without forcing a scroll to the right edge.
-  const completedWeeks = weeklyResults.slice().sort((a,b) => b.wk - a.wk);
+  const completedWeeks = completedResults.slice().sort((a,b) => b.wk - a.wk);
 
   // Copy-to-clipboard state. After a successful copy we flip the chip to
   // "Copied" for ~1.5s so the user sees confirmation before it resets.

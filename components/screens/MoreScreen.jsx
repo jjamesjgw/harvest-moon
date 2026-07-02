@@ -11,7 +11,12 @@ import { FD, FI, FL, T } from '@/lib/constants';
 // each section gets a readable headline instead of a generic row.
 export default function MoreScreen({ state, me, onNav, onSignOut }) {
   const { schedule, currentWeek, weeklyResults } = state;
-  const lastResult = [...weeklyResults].sort((a, b) => b.wk - a.wk)[0];
+  // Only weeks the season has moved past (wk ≤ currentWeek-1) count as the
+  // "last result" for this descriptor — the current week's live/ingested row
+  // isn't final yet and would disagree with the recap this links to.
+  const lastResult = [...weeklyResults]
+    .filter(w => w.wk <= currentWeek - 1)
+    .sort((a, b) => b.wk - a.wk)[0];
   const isAdmin = !!me.isAdmin;
 
   return <div style={{ paddingBottom: 20 }}>
