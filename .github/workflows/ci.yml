@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Cancel superseded runs on the same ref (e.g. a new push to an open PR).
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: next build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          # Build-only placeholders — NOT real credentials. `next build` imports
+          # the API route modules, whose module-init guards throw if these are
+          # missing or implausibly short (the SUPABASE_SERVICE_ROLE_KEY length
+          # check, the "CRON_SECRET or INGEST_SECRET" check, etc.). These values
+          # only satisfy those presence/length checks so the production build
+          # compiles; real values live in Vercel's environment settings.
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-dummy-anon-key
+          SUPABASE_SERVICE_ROLE_KEY: ci-dummy-service-role-key-000000000000000000000000000000
+          SESSION_SECRET: ci-dummy-session-secret-0000000000000000
+          CRON_SECRET: ci-dummy-cron-secret
+          NEXT_PUBLIC_VAPID_PUBLIC_KEY: ci-dummy-vapid-public-key
