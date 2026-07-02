@@ -128,7 +128,11 @@ function LastRaceStrip({ state, me, onNav }) {
   const myPts = ptsMap[me.id] || 0;
   const entries = state.players.map(p => ({ id: p.id, name: p.name, pts: ptsMap[p.id] || 0 }));
   const topPts = Math.max(...entries.map(e => e.pts));
-  const winners = entries.filter(e => e.pts === topPts);
+  // No winner unless someone actually scored. A week where everyone blanked
+  // (the All-Star week when nobody picked the race winner → all 0) would
+  // otherwise flag every player as a co-winner: "A & B & C & … won the week (0)".
+  const hasWinner = topPts > 0;
+  const winners = hasWinner ? entries.filter(e => e.pts === topPts) : [];
   const youWon = winners.some(w => w.id === me.id);
 
   // Order entries descending to compute your finish position.
@@ -138,9 +142,11 @@ function LastRaceStrip({ state, me, onNav }) {
 
   // Build label
   const winnerName = winners.map(w => w.name).join(' & ');
-  const body = youWon
-    ? `You won the week (${myPts} pts) 🏆`
-    : `You: ${myRank}${ord} (${myPts}) · ${winnerName} won the week (${topPts})`;
+  const body = !hasWinner
+    ? `Nobody scored this week`
+    : youWon
+      ? `You won the week (${myPts} pts) 🏆`
+      : `You: ${myRank}${ord} (${myPts}) · ${winnerName} won the week (${topPts})`;
 
   return <>
     <SectionLabel right={<LinkArrow onClick={() => onNav('recap', { wk: prevWk })}>Recap</LinkArrow>}>
