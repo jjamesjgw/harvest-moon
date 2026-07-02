@@ -27,7 +27,18 @@ export default function SlotPickScreen({ state, setState, me, onNav }) {
     if (taken.has(slot)) return;
     if (!picker || (picker.id !== me.id && !me.isAdmin)) return; // on-the-clock player or admin only
     setState(s => {
+      // Re-validate against the freshest state. `picker`, `idx` and `taken`
+      // were computed at render time; if a remote slot pick (or a double-tap)
+      // advanced the clock since then, assigning under the render-time picker
+      // would overwrite the PREVIOUS picker's slot and push slotPickIdx past
+      // the real on-clock player — desyncing the assignment count from the
+      // index (phase could reach 'ready' with fewer than N slots filled).
+      // Bail and require a re-tap (#44, same class as #40).
+      if (s.draftState.slotPickIdx !== idx) return s;
       const baseAssign = s.draftState.slotAssign || {};
+      // The slot may have been claimed by the concurrent pick we just detected
+      // is absent — guard anyway in case of a same-index race.
+      if (Object.values(baseAssign).includes(slot)) return s;
       const newAssign = { ...baseAssign, [picker.id]: slot };
       const baseIdx = s.draftState.slotPickIdx;
       let next = baseIdx + 1;
@@ -72,6 +83,13 @@ export default function SlotPickScreen({ state, setState, me, onNav }) {
     if (!canUndo) return;
     const targetId = lastPicker.id;
     setState(s => {
+      // canUndo/lastPicker were resolved at render time against `idx`. If the
+      // clock advanced since (a teammate picked via realtime), the render-time
+      // lastPicker is no longer the most recent one — removing their slot and
+      // decrementing would corrupt the sequence. Bail unless the fresh index
+      // still matches this render (#44).
+      if (s.draftState.slotPickIdx !== idx) return s;
+      if (s.draftState.slotAssign[targetId] == null) return s;
       const { [targetId]: _removed, ...remainingAssign } = s.draftState.slotAssign;
       return {
         ...s,
