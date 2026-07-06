@@ -5,7 +5,7 @@ Private 6-person NASCAR fantasy league app.
 ## Stack
 - Next.js App Router (JavaScript, incremental TypeScript planned)
 - Supabase (Postgres + Auth + Realtime + Storage)
-- Vercel (deploys)
+- Vercel (deploys; auto-deploys `main`)
 - React 18
 
 ## Brand & Design System
@@ -20,16 +20,29 @@ Private 6-person NASCAR fantasy league app.
 4. Preserve existing constants and conventions even if they look unusual.
 5. Database changes go through `supabase/migrations/*.sql` only. Never modify production via the dashboard.
 6. RLS is non-negotiable on every table.
+7. Never reset, clear, or reseed league/season data without explicit confirmation naming exactly what will be affected.
 
 ## Working Files (canonical)
-- App routes: `app/`
+- App routes: `app/` (JSX — the repo is JavaScript today; no `.ts` files yet)
 - Components: `components/`
-- Server actions / route handlers: `app/api/`, `app/**/actions.ts`
-- Supabase client: `lib/supabase/`
-- Tokens: `lib/tokens.*`
+- Route handlers: `app/api/` (admin, auth, ingest-results, league, notify)
+- Supabase client: `lib/supabase.js`
+- Tokens & font stacks: `lib/constants.js`
+- Scoring / race data: `lib/scoring.js`, `lib/raceFeed.js`, `lib/data.js`
 - Migrations: `supabase/migrations/`
 
 ## Commit / PR Conventions
 - Branch: `kind/short-slug` — kinds: `feat`, `fix`, `chore`, `audit`, `refactor`, `db`
 - PR title matches branch slug
 - PR body: what changed, why, how to verify, rollback notes
+
+## Vocabulary
+- "push/merge to production", "make it live" = commit → PR → merge to `main` → Vercel auto-deploys → verify the live site
+- Terse replies ("1", "A", "do it") refer to the most recent numbered options — echo the chosen action in one line before executing
+
+## Environment (Justin's machine)
+- Windows 11. Repo on `S:`; home and `~/.claude` on `C:`.
+- No python on PATH — use Node for scripts and local servers.
+- Pick one shell dialect per command (PowerShell cmdlets fail in Git Bash and vice versa).
+- Temp files go in the session scratchpad, never `S:\tmp` (doesn't exist).
+- Local preview: `http://127.0.0.1:<port>`, not `localhost`.
