@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import { rollupPts } from '@/lib/scoring';
 import { parseRaceTime } from '@/lib/utils';
+import { DEFAULT_SCHEDULE } from '@/lib/data';
 import {
   deriveWikiSlug,
   fetchArticleHtml,
@@ -112,8 +113,28 @@ async function handle(req) {
   const target = findTargetRace(state, now);
   if (!target) return NextResponse.json({ skipped: 'no-race-due' });
 
-  const override = state.scheduleOverrides?.[target.wk]?.wikiSlug;
-  const slug = deriveWikiSlug(target.raceName, now.getFullYear(), override);
+  // Resolve the Wikipedia slug from code (DEFAULT_SCHEDULE), not the persisted
+  // state.schedule: the stored schedule can lag the code copy (it's only
+  // re-synced by a one-shot effect), so a wikiSlug added in lib/data.js would
+  // otherwise never reach the cron. A runtime scheduleOverrides[wk].wikiSlug
+  // still wins as an escape hatch. See lib/raceFeed.js deriveWikiSlug.
+  const canonical = DEFAULT_SCHEDULE.find(r => r.wk === target.wk) || target;
+  const raceName = canonical.raceName;
+  const override = state.scheduleOverrides?.[target.wk]?.wikiSlug ?? canonical.wikiSlug;
+
+  // Refuse to guess when a race name isn't unique and no explicit slug is set:
+  // the name-derived slug would resolve to the wrong same-named race's article
+  // (e.g. the spring vs summer "Cook Out 400") and silently import its results.
+  // Skip loudly instead so the week is entered manually (or a wikiSlug/override
+  // is added) rather than corrupted.
+  if (!override) {
+    const sameName = DEFAULT_SCHEDULE.filter(r => r.raceName === raceName);
+    if (sameName.length > 1) {
+      return NextResponse.json({ skipped: 'ambiguous-race-name', wk: target.wk, raceName });
+    }
+  }
+
+  const slug = deriveWikiSlug(raceName, now.getFullYear(), override);
 
   const fetched = await fetchArticleHtml(slug);
   if (!fetched.ok) return NextResponse.json({ skipped: fetched.reason, wk: target.wk, slug });
