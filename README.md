@@ -106,7 +106,9 @@ commit;
 
 ## Cron
 
-`vercel.json` schedules `/api/ingest-results` twice every Monday (02:00 and 14:00 UTC) to auto-fill Cup driver points from the Wikipedia race article for the most recent finished race. **Week advancement is still manual** — the commissioner taps "Save & Advance" in Enter Results.
+`vercel.json` schedules `/api/ingest-results` to auto-fill Cup driver points from the Wikipedia race article for the most recent finished race. See `vercel.json` for the authoritative schedule; it currently runs Sunday at 06:00 / 14:00 / 23:00 UTC and Monday at 01:00 / 03:00 / 05:00 UTC. The Sunday-morning runs exist so **Saturday-night races** (e.g. Richmond, Daytona II, Bristol Night Race) — which finish late Saturday ET — are picked up Sunday morning instead of waiting until Sunday night. Runs are idempotent: a week that already has Cup data is skipped, so extra runs are safe. **Week advancement is still manual** — the commissioner taps "Save & Advance" in Enter Results.
+
+To retry a missed ingest by hand, POST to `/api/ingest-results` with the `x-ingest-secret` header (see `INGEST_SECRET` in `.env.example`).
 
 ---
 
