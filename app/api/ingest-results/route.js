@@ -120,59 +120,97 @@ async function handle(req) {
   const parsed = parseFinalResults(fetched.html);
   if (!parsed.final) return NextResponse.json({ skipped: parsed.reason, wk: target.wk, slug });
 
-  // Preserve any bonuses / overrides the admin may have already entered for
-  // this week. Replace Cup driverPoints with fetched values.
-  const existing = state.weeklyResults?.find(w => w.wk === target.wk) || {};
   const cup = buildCupDriverPoints(parsed.results);
-  const driverPoints = { ...(existing.driverPoints || {}), ...cup };
 
-  const picks = state.draftHistory?.find(h => h.wk === target.wk)?.picks
-    || (target.wk === state.currentWeek ? (state.draftState?.picks || []) : []);
-
-  const pts = rollupPts(
-    state.players || [],
-    picks,
-    driverPoints,
-    existing.bonuses || {},
-    existing.overrides || {},
-  );
-
-  const newRow = {
-    ...existing,
-    wk: target.wk,
-    track: target.track,
-    driverPoints,
-    pts,
-    source: { provider: 'wikipedia', slug, ingestedAt: now.toISOString() },
+  // Merge the fetched Cup points onto a base state, preserving any bonuses /
+  // overrides the admin already entered for the week. Kept as a function so it
+  // can be recomputed against a freshly re-read row if a concurrent client
+  // write forces a CAS retry (below).
+  const buildIngestedState = (baseState) => {
+    const existing = baseState.weeklyResults?.find(w => w.wk === target.wk) || {};
+    const driverPoints = { ...(existing.driverPoints || {}), ...cup };
+    const picks = baseState.draftHistory?.find(h => h.wk === target.wk)?.picks
+      || (target.wk === baseState.currentWeek ? (baseState.draftState?.picks || []) : []);
+    const pts = rollupPts(
+      baseState.players || [],
+      picks,
+      driverPoints,
+      existing.bonuses || {},
+      existing.overrides || {},
+    );
+    const newRow = {
+      ...existing,
+      wk: target.wk,
+      track: target.track,
+      driverPoints,
+      pts,
+      source: { provider: 'wikipedia', slug, ingestedAt: new Date().toISOString() },
+    };
+    const newState = {
+      ...baseState,
+      weeklyResults: [
+        ...(baseState.weeklyResults || []).filter(w => w.wk !== target.wk),
+        newRow,
+      ],
+    };
+    return { newState, pts };
   };
 
-  const newState = {
-    ...state,
-    weeklyResults: [
-      ...(state.weeklyResults || []).filter(w => w.wk !== target.wk),
-      newRow,
-    ],
+  // Write through the SAME CAS RPC the client uses (upsert_league_with_cas)
+  // with a millisecond write_id — not a plain upsert with a seconds-scale id.
+  // The old direct upsert (a) had no concurrency predicate, so a client write
+  // landing between our select and write was silently clobbered, and (b) wrote
+  // a seconds-scale write_id ~1000x below any client's Date.now() ms id, which
+  // let a later stale client write pass the strict-greater CAS and erase the
+  // freshly ingested results. See lib/useLeague.js (the ms write_id invariant)
+  // and supabase/migrations/20260521010000_league_cas_rpc.sql.
+  const casWrite = async (baseState) => {
+    const { newState, pts } = buildIngestedState(baseState);
+    const { data: rpc, error: rpcErr } = await admin.rpc('upsert_league_with_cas', {
+      p_id: LEAGUE_ID,
+      p_state: newState,
+      p_client_tag: 'ingest-cron',
+      p_write_id: Date.now(),
+    });
+    return { rpc, rpcErr, pts };
   };
 
-  const writeId = Math.floor(Date.now() / 1000);
-  // Snapshot before the upsert so a bad parse or scoring bug can be rolled
-  // back from leagues_snapshots. withSnapshot throws if the snapshot fails,
-  // so we never overwrite state without a recovery point.
-  const { error: writeErr } = await withSnapshot(`pre-ingest:wk${target.wk}`, () =>
-    admin.from('leagues').upsert({
-      id: LEAGUE_ID,
-      state: newState,
-      client_tag: 'ingest-cron',
-      write_id: writeId,
-      updated_at: now.toISOString(),
-    }),
-  );
-  if (writeErr) {
-    console.error('[ingest/upsert]', writeErr);
-    return NextResponse.json({ error: writeErr.message }, { status: 500 });
+  // Snapshot once before the first attempt so a bad parse or scoring bug can be
+  // rolled back from leagues_snapshots (fail-closed — withSnapshot throws if the
+  // snapshot can't be taken, so we never write without a recovery point).
+  let attempt = await withSnapshot(`pre-ingest:wk${target.wk}`, () => casWrite(state));
+
+  // On a stale-write rejection, a client write landed after our initial select.
+  // Re-read the winning state, re-merge our Cup results onto it (picking up the
+  // client's change instead of reverting it), and retry once — no second
+  // snapshot needed.
+  if (!attempt.rpcErr && attempt.rpc?.ok !== true) {
+    const { data: fresh, error: reselErr } = await admin
+      .from('leagues')
+      .select('state')
+      .eq('id', LEAGUE_ID)
+      .maybeSingle();
+    if (!reselErr && fresh?.state) {
+      attempt = await casWrite(fresh.state);
+    }
   }
 
-  // The leagues_notify trigger fires on this upsert and pushes a
+  if (attempt.rpcErr) {
+    console.error('[ingest/cas]', attempt.rpcErr);
+    return NextResponse.json({ error: attempt.rpcErr.message }, { status: 500 });
+  }
+  if (attempt.rpc?.ok !== true) {
+    // Still stale after one retry — a client is actively winning writes. Safe to
+    // defer: the week still lacks Cup data, so the next cron tick re-ingests
+    // (findTargetRace is idempotent). Not an error.
+    return NextResponse.json({
+      skipped: 'stale-write',
+      wk: target.wk,
+      server_write_id: attempt.rpc?.server_write_id ?? null,
+    });
+  }
+
+  // The leagues_notify trigger fires on this write and pushes a
   // "Week N results posted" notification via /api/notify.
   return NextResponse.json({
     ok: true,
@@ -180,7 +218,7 @@ async function handle(req) {
     track: target.track,
     slug,
     cupDrivers: Object.keys(cup).length,
-    pts,
+    pts: attempt.pts,
   });
 }
 
