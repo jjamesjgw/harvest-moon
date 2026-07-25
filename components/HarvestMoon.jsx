@@ -34,6 +34,28 @@ import DriversScreen from '@/components/screens/DriversScreen';
 
 // ─── HELPERS ─────────────────────────────────────────────────────
 
+// Screens a push notification is allowed to deep-link to. /api/notify sends
+// '/?screen=draft' (pick made / you're on the clock) and '/?screen=standings'
+// (results posted); the rest are safe read-only destinations for future
+// payloads. Deliberately excludes commissioner screens — a notification tap
+// should never land on a destructive control.
+const DEEP_LINK_SCREENS = new Set(['home', 'draft', 'standings', 'team', 'recap', 'schedule']);
+
+// Reads (and clears) a ?screen= deep link from the URL. Returns null when the
+// param is absent or not allow-listed. The param is stripped via replaceState
+// so a later reload doesn't silently re-navigate the user.
+function consumeScreenParam() {
+  if (typeof window === 'undefined') return null;
+  try {
+    const url = new URL(window.location.href);
+    const raw = url.searchParams.get('screen');
+    if (!raw) return null;
+    url.searchParams.delete('screen');
+    window.history.replaceState(null, '', url.pathname + url.search + url.hash);
+    return DEEP_LINK_SCREENS.has(raw) ? raw : null;
+  } catch { return null; }
+}
+
 // Maps a sub-screen id to the bottom-tab it belongs under (for highlight state).
 const SCREEN_TO_TAB = {
   home:'home',
@@ -87,6 +109,12 @@ export default function App() {
   const { state: rawState, setState: setStateRemote, resetSeason: resetSeasonRemote, loading, saveStatus, lastError, sessionExpired, retry, refresh, refreshing, fetchSucceeded } = useLeague();
 
   const [screen, setScreen] = useState('home');
+  // Pending push deep-link target. Consumed once the league state and signed-in
+  // player are available, because resolving 'draft' correctly (slot picker vs
+  // snake board) needs draftState — see resolveTarget. Both entry points feed
+  // this: a ?screen= param on cold start, and a postMessage from the service
+  // worker when the app was already open.
+  const [pendingDeepScreen, setPendingDeepScreen] = useState(() => consumeScreenParam());
   // Persistent login: rehydrate the last-signed-in player ID from localStorage
   // so cold starts (especially after iOS Safari reaps the PWA) don't require
   // re-entering name + PIN every time. The id is just a routing handle —
@@ -387,6 +415,33 @@ export default function App() {
     if (historyRef.current.length > 30) historyRef.current.shift(); // bound memory
     setScreen(target);
   };
+
+  // Apply a pending push deep link once it can actually be resolved. Gated on
+  // `me` and `state` so a cold start that lands on the login gate keeps the
+  // target until sign-in completes instead of dropping it, and so 'draft'
+  // resolves to the slot picker vs the snake board correctly. Routed through
+  // onNav to reuse the history-stack and same-target no-op behavior.
+  useEffect(() => {
+    if (!pendingDeepScreen || !me || !state) return;
+    const target = pendingDeepScreen;
+    setPendingDeepScreen(null);
+    onNav(target);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingDeepScreen, me, state]);
+
+  // Service-worker → app navigation. When a notification is tapped while the
+  // app is already open, sw.js posts the target screen rather than navigating
+  // the window (which would force a full SPA reload just to change screens).
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !navigator.serviceWorker) return;
+    const onMessage = (e) => {
+      if (e.data?.type !== 'hm-navigate') return;
+      const s = e.data.screen;
+      if (typeof s === 'string' && DEEP_LINK_SCREENS.has(s)) setPendingDeepScreen(s);
+    };
+    navigator.serviceWorker.addEventListener('message', onMessage);
+    return () => navigator.serviceWorker.removeEventListener('message', onMessage);
+  }, []);
 
   const activeTab = SCREEN_TO_TAB[screen] || 'home';
 
