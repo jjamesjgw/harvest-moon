@@ -20,15 +20,26 @@ function resolveAccount(rawName) {
   return CANONICAL_PLAYERS.find(p => p.name.toLowerCase() === key) || null;
 }
 
-// Vercel terminates TLS and sets x-forwarded-for to a comma-separated list
-// with the real client IP first. Fall back to x-real-ip. Returns '' when the
-// caller can't be identified (e.g. local dev) — record_login_attempt() lets
-// empty IPs through, so login still works.
+// Resolve the caller's IP for the per-IP login throttle.
+//
+// Preference order matters. x-forwarded-for is the classic footgun: it's a
+// caller-supplied list that the platform APPENDS to, so its leftmost token can
+// be an arbitrary value the client prepended — and rotating that token per
+// request would defeat the per-IP cap entirely. x-vercel-forwarded-for and
+// x-real-ip are set by the platform, so prefer those and only fall back to the
+// leftmost XFF token when neither is present (e.g. local dev).
+//
+// Returns '' when the caller can't be identified — record_login_attempt() lets
+// empty IPs through, so login still works. The per-ACCOUNT lockout (5 failures
+// / 15 min, migration 20260603120000) is the hard brute-force backstop and is
+// keyed on the account name, so it holds regardless of IP spoofing.
 function clientIp(req) {
+  const vercel = (req.headers.get('x-vercel-forwarded-for') || '').trim();
+  if (vercel) return vercel.split(',')[0].trim();
+  const real = (req.headers.get('x-real-ip') || '').trim();
+  if (real) return real;
   const xff = req.headers.get('x-forwarded-for') || '';
-  const first = xff.split(',')[0].trim();
-  if (first) return first;
-  return (req.headers.get('x-real-ip') || '').trim();
+  return xff.split(',')[0].trim();
 }
 
 export async function POST(req) {

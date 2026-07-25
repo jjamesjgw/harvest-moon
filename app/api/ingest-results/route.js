@@ -56,17 +56,25 @@ const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
 // Accept either a Vercel cron call (Authorization: Bearer ${CRON_SECRET})
 // or a manual call (x-ingest-secret: ${INGEST_SECRET}). Two secrets so
 // cron can be revoked without breaking ad-hoc manual triggers.
+// Constant-time string compare. Length is not secret, so an early length
+// mismatch is fine (timingSafeEqual requires equal-length buffers anyway).
+function safeEqual(a, b) {
+  const ab = Buffer.from(String(a));
+  const bb = Buffer.from(String(b));
+  if (ab.length !== bb.length) return false;
+  return crypto.timingSafeEqual(ab, bb);
+}
+
 function authorized(req) {
-  const cronSecret = CRON_SECRET;
-  const ingestSecret = INGEST_SECRET;
+  // Both paths use a constant-time compare. The CRON_SECRET branch previously
+  // used plain `===`, which short-circuits on the first differing byte, while
+  // the INGEST_SECRET branch right below it was already timing-safe — an
+  // inconsistency worth removing even though a remote timing attack against a
+  // high-entropy random secret is impractical.
   const auth = req.headers.get('authorization') || '';
-  if (cronSecret && auth === `Bearer ${cronSecret}`) return true;
+  if (CRON_SECRET && auth && safeEqual(auth, `Bearer ${CRON_SECRET}`)) return true;
   const given = req.headers.get('x-ingest-secret') || '';
-  if (ingestSecret && given) {
-    const a = Buffer.from(ingestSecret);
-    const b = Buffer.from(given);
-    if (a.length === b.length && crypto.timingSafeEqual(a, b)) return true;
-  }
+  if (INGEST_SECRET && given && safeEqual(given, INGEST_SECRET)) return true;
   return false;
 }
 
