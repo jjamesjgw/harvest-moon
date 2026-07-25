@@ -4,9 +4,9 @@ Private 6-person NASCAR fantasy league app.
 
 ## Stack
 - Next.js App Router (JavaScript, incremental TypeScript planned)
-- Supabase (Postgres + Auth + Realtime + Storage)
+- Supabase (Postgres + Realtime). Auth is a custom PIN + HMAC `hm_session` cookie — **not** Supabase Auth. Supabase Storage is not used.
 - Vercel (deploys; auto-deploys `main`)
-- React 18
+- React 19
 
 ## Brand & Design System
 - Aesthetic: quiet luxury editorial — warm paper, deep ink, copper accents
@@ -32,7 +32,7 @@ Private 6-person NASCAR fantasy league app.
 - Migrations: `supabase/migrations/`
 
 ## Commit / PR Conventions
-- Branch: `kind/short-slug` — kinds: `feat`, `fix`, `chore`, `audit`, `refactor`, `db`
+- Branch: `kind/short-slug` — kinds: `feat`, `fix`, `chore`, `audit`, `refactor`, `db`, `docs`
 - PR title matches branch slug
 - PR body: what changed, why, how to verify, rollback notes
 

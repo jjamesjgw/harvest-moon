@@ -1,25 +1,19 @@
--- Harvest Moon: one-time Supabase setup
--- Paste this entire file into Supabase → SQL Editor → New query → Run
-
--- 1. The one table we need: a single row per league, state stored as JSON
-create table if not exists public.leagues (
-  id          text primary key,
-  state       jsonb not null,
-  write_id    bigint default 0,
-  updated_at  timestamptz default now()
-);
-
--- 2. Enable row-level security. Anon can SELECT (needed for the client's
---    initial pull and the realtime subscription) but cannot write — every
---    mutating call has to go through /api/league, which uses the service-
---    role key. Login is gated by /api/auth/login → hm_session cookie.
-alter table public.leagues enable row level security;
-
-drop policy if exists "anon read"   on public.leagues;
-drop policy if exists "anon insert" on public.leagues;
-drop policy if exists "anon update" on public.leagues;
-
-create policy "anon read" on public.leagues for select using (true);
-
--- 3. Broadcast row changes over the Realtime channel
-alter publication supabase_realtime add table public.leagues;
+-- SUPERSEDED — do not run this file.
+--
+-- This was the original one-time setup script. It is no longer the schema:
+-- the live schema is the sum of every file in supabase/migrations/, squashed
+-- into 20260512040000_baseline.sql and extended incrementally after that.
+--
+-- Running it on a fresh project would produce a BROKEN database. It creates
+-- public.leagues WITHOUT the client_tag column, so the baseline's
+-- `create table if not exists` becomes a silent no-op and every subsequent
+-- league write fails (leagues_pre_update_guard reads OLD.client_tag;
+-- upsert_league_with_cas sets client_tag). It also omits pins/verify_pin
+-- (login impossible), leagues_history (no audit trail, no fresh-overwrite
+-- protection), leagues_snapshots, and push_subs.
+--
+-- To set up a fresh project:   supabase db push
+-- To change the schema:        add a new file under supabase/migrations/
+--
+-- Kept as a stub rather than deleted so anyone following an old link or an
+-- old shell-history command lands on this warning instead of a 404.

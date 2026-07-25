@@ -12,7 +12,9 @@ Private 6-person NASCAR fantasy league app. Realtime sync — when one player pi
 app/
   api/
     auth/                 PIN login + logout
-    league/               main read/write endpoint (service-role)
+    league/               main WRITE endpoint (service-role, CAS). Reads go
+                          direct from the client via the anon SELECT policy
+    league/reset/         sanctioned season wipe (admin-only, snapshot-first)
     ingest-results/       cron-driven Wikipedia results ingest
     admin/snapshot/       on-demand DB snapshot
     notify/               web-push fan-out
@@ -24,10 +26,15 @@ lib/
   constants.js            tokens, font stacks, CANONICAL_PLAYERS, ADMIN_ID
   utils.js                standings, snake order, schedule
   scoring.js              weekly point rollup
-  supabase/               client + service-role helpers
+  supabase.js             anon browser client (service-role clients are
+                          constructed per-route, not here)
+  session.js              hm_session cookie sign/verify (server-only)
+  raceFeed.js             Wikipedia fetch + results parsing
+  db/snapshot.js          withSnapshot() — fail-closed pre-flight snapshots
 supabase/
   migrations/             numbered SQL — the only path to prod schema changes
   config.toml             supabase CLI config
+  schema.sql, push.sql    legacy/template only — NOT setup scripts (see their headers)
 vercel.json               cron schedules
 ```
 
@@ -48,11 +55,14 @@ Set these in Vercel for all environments (Production, Preview, Development):
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase → Project Settings → API | client + every server route |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | same | anon supabase-js client |
 | `SUPABASE_SERVICE_ROLE_KEY` | same — **never expose to the client** | `/api/league`, `/api/ingest-results`, `/api/admin/snapshot`. Must be the full ~210-char JWT; module-init guards throw at cold-start if it's missing or implausibly short |
+| `SESSION_SECRET` | random, **min 32 chars** | signs the `hm_session` cookie. `lib/session.js` throws at cold start if it's missing or shorter, so **every login 500s without it**. Rotating it invalidates every live session (all 6 players re-enter their PIN) |
 | `NEXT_PUBLIC_LEAGUE_ID` | choose | row id in `public.leagues` (default: `harvest-moon`) |
 | `CRON_SECRET` | random | Vercel cron auth header for `/api/ingest-results` |
 | `INGEST_SECRET` | random | manual ingest trigger via `x-ingest-secret` |
 | `NOTIFY_SECRET` | random | must match the secret in `notify_league_changes()` (inlined in baseline migration) |
-| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | `npx web-push generate-vapid-keys` | web push — see `docs/push-setup.md` |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | `npx web-push generate-vapid-keys` | web push — see `docs/push-setup.md` (which also covers `NEXT_PUBLIC_VAPID_PUBLIC_KEY` and `VAPID_SUBJECT`) |
+
+`.env.example` is the authoritative list — if it and this table ever disagree, trust `.env.example`.
 
 ---
 
@@ -83,6 +93,8 @@ Key surfaces:
 - `public.push_subs` — web-push subscriptions
 
 **Database changes go through `supabase/migrations/*.sql` only — never edit prod via the dashboard.** Apply via the Supabase CLI (`supabase db push`) or paste into the SQL editor for one-offs.
+
+The one standing exception is `notify_league_changes()`, which carries the notify URL and secret inline (Supabase can't read env vars from SQL). The committed migration ships `REPLACE_WITH_*` placeholders, so **on a fresh project push notifications are silently dead until that function body is re-applied with real values** — the trigger fires, `pg_net` discards the result, and nothing surfaces an error. The procedure is `docs/push-setup.md` section 3. (An older comment inside the baseline migration points at `docs/staging-supabase-setup.md`, which no longer exists — use `docs/push-setup.md`.)
 
 ### Recovering from a bad write
 

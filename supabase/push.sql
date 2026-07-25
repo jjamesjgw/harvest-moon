@@ -1,5 +1,14 @@
--- Harvest Moon: push-notification additions to the existing schema.
--- Run this once in Supabase SQL editor AFTER schema.sql.
+-- Harvest Moon: NOTIFY_SECRET rotation template — NOT a setup script.
+--
+-- The push schema (push_subs, notify_league_changes, the leagues_notify
+-- trigger) already ships in supabase/migrations/20260512040000_baseline.sql
+-- and is applied by `supabase db push`. Do NOT run this file to set up a
+-- project; see supabase/schema.sql for why the old paste-me flow is dead.
+--
+-- What this file is still for: notify_league_changes() carries the notify URL
+-- and secret inline, and Supabase does not permit reading env vars from SQL,
+-- so rotating NOTIFY_SECRET means re-applying the function body with the new
+-- value. Follow docs/push-setup.md section 3.
 --
 -- BEFORE RUNNING: replace REPLACE_WITH_NOTIFY_URL and REPLACE_WITH_NOTIFY_SECRET
 -- inside notify_league_changes() below with your real values, then paste the
