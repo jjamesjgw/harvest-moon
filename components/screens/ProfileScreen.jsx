@@ -1,7 +1,7 @@
 'use client';
 import React, { useEffect, useState } from 'react';
 import { BackChip, CarNum, Field, MenuRow, PlayerBadge, SectionLabel, TopBar, WinsCount } from '@/components/ui/primitives';
-import { ADMIN_ID, FB, FD, FI, FL, T } from '@/lib/constants';
+import { FB, FD, FI, FL, T, isAdminId } from '@/lib/constants';
 import { DEFAULT_DRIVERS } from '@/lib/data';
 import { computeStandings, standingsThroughWeek } from '@/lib/utils';
 import { disablePush, enablePush, getPushStatus } from '@/lib/push';
@@ -168,7 +168,7 @@ export default function ProfileScreen({ state, setState, me, onBack, saveStatus,
   // Show the view-as-user toggle only for the actual commissioner account,
   // independent of the current toggle state — we check me.id directly
   // because me.isAdmin already reflects the toggle.
-  const isCommissioner = me.id === ADMIN_ID;
+  const isCommissioner = isAdminId(me.id);
   const update = (field, val) => {
     setState(s => ({
       ...s,

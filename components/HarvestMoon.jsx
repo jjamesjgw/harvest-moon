@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useLeague } from '@/lib/useLeague';
 import { useGlobalStyles } from '@/lib/globalStyles';
 import {
-  T, FI, ADMIN_ID, CANONICAL_PLAYERS,
+  T, FI, ADMIN_ID, CANONICAL_PLAYERS, isAdminId,
 } from '@/lib/constants';
 import { DEFAULT_DRIVERS, DEFAULT_SCHEDULE } from '@/lib/data';
 import {
@@ -196,7 +196,7 @@ export default function App() {
     ? state.players.find(p => p.id === meId)
     : null;
   const me = rawMe
-    ? { ...rawMe, isAdmin: !viewAsUser && rawMe.id === ADMIN_ID }
+    ? { ...rawMe, isAdmin: !viewAsUser && isAdminId(rawMe.id) }
     : null;
 
   // Auto-init a fresh league row if Supabase has no document yet.

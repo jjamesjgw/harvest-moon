@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { ADMIN_ID, CANONICAL_PLAYERS } from '@/lib/constants';
+import { CANONICAL_PLAYERS, isAdminId } from '@/lib/constants';
 import { createSessionCookie } from '@/lib/session';
 
 export const runtime = 'nodejs';
@@ -78,7 +78,7 @@ export async function POST(req) {
   const cookie = createSessionCookie({
     playerId: account.id,
     name: account.name,
-    isAdmin: account.id === ADMIN_ID,
+    isAdmin: isAdminId(account.id),
   });
   return NextResponse.json({ ok: true, account }, {
     status: 200,
