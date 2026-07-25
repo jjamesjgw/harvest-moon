@@ -28,6 +28,23 @@ export default function SlotPickScreen({ state, setState, me, onNav }) {
     if (!picker || (picker.id !== me.id && !me.isAdmin)) return; // on-the-clock player or admin only
     setState(s => {
       const baseAssign = s.draftState.slotAssign || {};
+      // Re-validate against the state we're actually writing onto, not the
+      // render-time snapshot the checks above used (#44 class). Two players
+      // tapping inside one realtime-propagation window would otherwise both
+      // pass the render-time `taken` check and write different players to the
+      // SAME slot number. buildSnakeOrder inverts slotAssign into
+      // slot → playerId, so the second write silently overwrites the first:
+      // one player vanishes from the snake order entirely and their turns
+      // render as empty picks. Bail out unchanged instead — the tap is simply
+      // ignored and the picker can re-tap an open slot.
+      //
+      // Deliberately re-checks the INDEX rather than recomputing the pick
+      // order from `s`: updaters receive the raw Supabase payload, whose
+      // `players` may carry pre-canonical ids, so `s`-derived ids can't be
+      // compared against the migrated `picker.id` safely.
+      if (Object.values(baseAssign).includes(slot)) return s;   // slot claimed
+      if (baseAssign[picker.id] != null) return s;              // already picked
+      if (s.draftState.slotPickIdx !== idx) return s;           // turn moved on
       const newAssign = { ...baseAssign, [picker.id]: slot };
       const baseIdx = s.draftState.slotPickIdx;
       let next = baseIdx + 1;
