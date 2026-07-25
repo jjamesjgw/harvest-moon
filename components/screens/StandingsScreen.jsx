@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { BackChip, PlayerBadge, SectionLabel, TopBar, WinsCount } from '@/components/ui/primitives';
 import { FB, FD, FI, FL, T } from '@/lib/constants';
-import { computeStandings, finalizedWeeks } from '@/lib/utils';
+import { computeStandings, finalizedWeeks, isSeasonComplete, standingsThroughWeek } from '@/lib/utils';
 
 // Compute trend signals for one player. Returns null if there's no
 // completed week yet (nothing to trend on). All three signals are
@@ -193,7 +193,11 @@ async function copyText(text) {
 
 export default function StandingsScreen({ state, me, onNav }) {
   const { players, weeklyResults, currentWeek } = state;
-  const standings = computeStandings(players, weeklyResults, currentWeek - 1);
+  // Includes the final race once the season is complete — see
+  // standingsThroughWeek. Mid-season this is exactly currentWeek - 1.
+  const throughWk = standingsThroughWeek(state);
+  const seasonComplete = isSeasonComplete(state);
+  const standings = computeStandings(players, weeklyResults, throughWk);
   const sorted = [...standings].sort((a,b) => b.seasonPts - a.seasonPts);
   // Completed weeks only, declared before its consumers below. Filters out the
   // current week's in-progress row — written on every keystroke during results
@@ -223,7 +227,7 @@ export default function StandingsScreen({ state, me, onNav }) {
   // "Copied" for ~1.5s so the user sees confirmation before it resets.
   const [copyState, setCopyState] = useState('idle'); // 'idle' | 'ok' | 'err'
   const onCopy = async () => {
-    const text = formatStandingsText(sorted, currentWeek - 1);
+    const text = formatStandingsText(sorted, throughWk);
     const ok = await copyText(text);
     setCopyState(ok ? 'ok' : 'err');
     setTimeout(() => setCopyState('idle'), 1500);
@@ -232,7 +236,7 @@ export default function StandingsScreen({ state, me, onNav }) {
   const canCopy = completedWeeks.length > 0;
 
   return <div style={{ paddingBottom:20 }}>
-    <TopBar subtitle={`Through Week ${String(currentWeek - 1).padStart(2,'0')}`} title="Standings" right={<BackChip onClick={() => onNav('back')}/>}/>
+    <TopBar subtitle={seasonComplete ? 'Final · Season Complete' : `Through Week ${String(throughWk).padStart(2,'0')}`} title="Standings" right={<BackChip onClick={() => onNav('back')}/>}/>
 
     <div style={{ padding:'0 20px 20px' }}>
       <div style={{ background: T.ink, color: T.bg, borderRadius:4, padding:'22px 20px', position:'relative' }}>
