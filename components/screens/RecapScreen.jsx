@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { BackChip, CarNum, PlayerBadge, SectionLabel, TopBar } from '@/components/ui/primitives';
 import { FB, FD, FI, FL, SERIES, T } from '@/lib/constants';
 import { shareOrDownloadCard } from '@/lib/shareCard';
-import { resolvePickDriver } from '@/lib/utils';
+import { finalizedWeeks, resolvePickDriver } from '@/lib/utils';
 
 function SeriesTag({ series }) {
   if (!series || series === 'Cup') return null;
@@ -18,7 +18,22 @@ function SeriesTag({ series }) {
 }
 
 export default function RecapScreen({ state, onNav, viewWk, onConsumeViewWk }) {
-  const { players, weeklyResults, draftHistory = [] } = state;
+  const { players, weeklyResults, currentWeek, draftHistory = [] } = state;
+
+  // ── Hooks ─────────────────────────────────────────────────────────
+  // ALL hooks must run before the empty-state early return below. The first
+  // week finalizing while this screen is open flips that branch, and if the
+  // hook count changed across those renders React throws "Rendered more hooks
+  // than during the previous render" — white-screening the app at exactly the
+  // moment the league is watching results land.
+
+  // Latch the deep-link week on mount. The consume effect below clears the
+  // parent's stash, which re-renders this screen with viewWk=null — so reading
+  // the prop directly would fall back to the newest week one frame after
+  // arriving. Latching keeps the caller's intended week for the whole visit.
+  const [latchedWk] = useState(viewWk);
+
+  const [shareState, setShareState] = useState('idle'); // 'idle' | 'busy' | 'shared' | 'downloaded' | 'error'
 
   // Consume the deep-link stash on mount so back/forward navigation can't
   // accidentally re-open the same week.
@@ -27,7 +42,12 @@ export default function RecapScreen({ state, onNav, viewWk, onConsumeViewWk }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewWk]);
 
-  if (weeklyResults.length === 0) {
+  // Only completed weeks belong in a recap — an in-progress row (written on
+  // every keystroke while the commissioner enters results) would otherwise
+  // render as "Final" with partial points.
+  const finalWeeks = finalizedWeeks(weeklyResults, currentWeek);
+
+  if (finalWeeks.length === 0) {
     return <div style={{ paddingBottom:20 }}>
       <TopBar title="Race Recap" right={<BackChip onClick={() => onNav('back')}/>}/>
       <div style={{ padding:'40px 28px', textAlign:'center' }}>
@@ -38,10 +58,10 @@ export default function RecapScreen({ state, onNav, viewWk, onConsumeViewWk }) {
     </div>;
   }
 
-  // viewWk lets Home (or any caller) deep-link to a specific finalized
+  // latchedWk lets Home (or any caller) deep-link to a specific finalized
   // week. Falls back to the most-recent finalized week when null.
-  const explicit = viewWk != null ? weeklyResults.find(w => w.wk === viewWk) : null;
-  const last = explicit || weeklyResults.slice().sort((a,b) => b.wk - a.wk)[0];
+  const explicit = latchedWk != null ? finalWeeks.find(w => w.wk === latchedWk) : null;
+  const last = explicit || finalWeeks.slice().sort((a,b) => b.wk - a.wk)[0];
   const sortedRes = players.map(p => ({ ...p, pts: last.pts[p.id] || 0 })).sort((a,b) => b.pts - a.pts);
   const hist = draftHistory.find(h => h.wk === last.wk);
   const raceMeta = (state.schedule || []).find(s => s.wk === last.wk);
@@ -51,7 +71,6 @@ export default function RecapScreen({ state, onNav, viewWk, onConsumeViewWk }) {
   // back to a download otherwise. The button label adapts to its capability:
   // "Share" when native is available, "Download" otherwise — so users see
   // the right verb for what will actually happen.
-  const [shareState, setShareState] = useState('idle'); // 'idle' | 'busy' | 'shared' | 'downloaded' | 'error'
   // canShare is computed once on mount; recomputing it every render is cheap
   // but the API only matters at click-time so we don't track it as state.
   const supportsNativeShare = (() => {

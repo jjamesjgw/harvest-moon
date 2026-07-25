@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { BackChip, PlayerBadge, SectionLabel, TopBar, WinsCount } from '@/components/ui/primitives';
 import { FB, FD, FI, FL, T } from '@/lib/constants';
-import { computeStandings } from '@/lib/utils';
+import { computeStandings, finalizedWeeks } from '@/lib/utils';
 
 // Compute trend signals for one player. Returns null if there's no
 // completed week yet (nothing to trend on). All three signals are
@@ -212,8 +212,10 @@ export default function StandingsScreen({ state, me, onNav }) {
   const maxPts = Math.max(...sorted.map(s => s.seasonPts));
   const spread = Math.max(1, maxPts - minPts);
   // Most recent week on the left so the table opens to current-season context
-  // without forcing a scroll to the right edge.
-  const completedWeeks = weeklyResults.slice().sort((a,b) => b.wk - a.wk);
+  // without forcing a scroll to the right edge. Filtered to completed weeks so
+  // the By-Week table can't show an in-progress column while the season totals
+  // above it (computed through currentWeek - 1) exclude that same week.
+  const completedWeeks = finalizedWeeks(weeklyResults, currentWeek).sort((a,b) => b.wk - a.wk);
 
   // Copy-to-clipboard state. After a successful copy we flip the chip to
   // "Copied" for ~1.5s so the user sees confirmation before it resets.
