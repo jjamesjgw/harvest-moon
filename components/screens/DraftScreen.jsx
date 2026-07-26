@@ -189,6 +189,15 @@ export default function DraftScreen({ state, setState, me, onNav }) {
     if (pickedKeys.has(pickKey(activeSeries, driver.num))) return;
     if (remainingForPicker(activeSeries) <= 0) return;
     setState(s => {
+      // Re-validate against the freshest state INSIDE the updater. Reading
+      // s.draftState.picks fresh isn't enough on its own: onClock/round/slot
+      // and the taken-driver guards were all computed from the render-time
+      // picks.length. If any pick landed since that render — a teammate's via
+      // realtime, or a rapid double-tap — the clock has advanced and stamping
+      // this pick with the previous turn's playerId/round/slot would attribute
+      // it to the wrong player and overshoot the order. Bail and require a
+      // re-tap rather than corrupt the board (#44, same class as #40).
+      if (s.draftState.picks.length !== pickIdx) return s;
       const newPicks = [...s.draftState.picks, {
         driverNum: driver.num,
         driverName: driver.name, // snapshot for history when bonus drivers go away later
@@ -229,17 +238,35 @@ export default function DraftScreen({ state, setState, me, onNav }) {
 
   const undo = () => {
     if (pickIdx === 0) return;
-    // Build the trimmed picks list from s.draftState.picks inside the updater
-    // so a concurrent remote pick that arrived after this render can't be
-    // silently dropped (#44).
-    setState(s => ({
-      ...s,
-      draftState: {
-        ...s.draftState,
-        picks: s.draftState.picks.slice(0, -1),
-        phase: 'snake',
-      },
-    }));
+    // Capture the exact pick the Undo button was authorized against at render
+    // time (its ownership gate checked THIS pick's playerId). We must remove
+    // that same pick, not merely "whatever is last now".
+    const lastAtRender = draftState.picks[draftState.picks.length - 1];
+    setState(s => {
+      const picks = s.draftState.picks;
+      const freshLast = picks[picks.length - 1];
+      // If a teammate's pick landed via realtime after this render, the fresh
+      // last pick is theirs — blindly slicing it off would delete a pick the
+      // user was never authorized to undo (the render-time canUndo gate
+      // checked ownership of the OLD last pick). Bail unless the current last
+      // pick is still the exact one we authorized (identity by
+      // at+playerId+driverNum+series). #44.
+      if (!freshLast || !lastAtRender
+          || freshLast.at !== lastAtRender.at
+          || freshLast.playerId !== lastAtRender.playerId
+          || freshLast.driverNum !== lastAtRender.driverNum
+          || (freshLast.series || 'Cup') !== (lastAtRender.series || 'Cup')) {
+        return s;
+      }
+      return {
+        ...s,
+        draftState: {
+          ...s.draftState,
+          picks: picks.slice(0, -1),
+          phase: 'snake',
+        },
+      };
+    });
   };
 
   // Visibility flags for the new header pieces. Toggle only matters once a
