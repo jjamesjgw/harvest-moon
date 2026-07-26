@@ -28,8 +28,8 @@ export default function DraftScreen({ state, setState, me, onNav }) {
   // View mode for the draft screen body. 'pick' = the existing driver pool
   // grid (used to make a selection). 'board' = a full snake grid showing
   // every pick so far, useful for spectators following along without
-  // losing place. The toggle only appears once at least one pick exists,
-  // and we revert to 'pick' if picks drain to zero (e.g. admin reset).
+  // losing place. Available as soon as the draft order exists — even with
+  // zero picks the board is the only place the full snake order is visible.
   const [mode, setMode] = useState('pick');
 
   // Resolve this week's draft shape from config (allotments per series + total rounds).
@@ -125,13 +125,6 @@ export default function DraftScreen({ state, setState, me, onNav }) {
   const currentPicker = onClock ? players.find(p => p.id === onClock.playerId) : null;
   const myTurn = currentPicker && currentPicker.id === me.id;
   const canPick = onClock && (onClock.playerId === me.id || isAdmin);
-
-  // Auto-revert to Pick mode if picks drain to zero (e.g. admin reset). The
-  // Board toggle is hidden in that state so without this we'd leave the
-  // user looking at an empty board with no way to flip back.
-  useEffect(() => {
-    if (pickIdx === 0 && mode === 'board') setMode('pick');
-  }, [pickIdx, mode]);
 
   // Track picks as series-scoped to allow same driver number across series.
   const pickedKeys = useMemo(
@@ -269,10 +262,12 @@ export default function DraftScreen({ state, setState, me, onNav }) {
     });
   };
 
-  // Visibility flags for the new header pieces. Toggle only matters once a
-  // pick has been made; strip lives in Pick mode (Board shows everything
-  // natively); series tabs are picking-affordances and stay hidden in Board.
-  const showToggle = !done && pickIdx > 0;
+  // Visibility flags for the new header pieces. Toggle is available for the
+  // whole live draft — the board is how the league sees the snake order
+  // before the first pick lands; strip lives in Pick mode (Board shows
+  // everything natively); series tabs are picking-affordances and stay
+  // hidden in Board.
+  const showToggle = !done;
   const showStrip = !done && pickIdx > 0 && mode === 'pick';
   const showSeriesTabs = !done && cfg.bonusSeries.length > 0 && currentPicker && mode === 'pick';
 
