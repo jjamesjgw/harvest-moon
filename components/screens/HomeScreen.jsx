@@ -3,7 +3,7 @@ import React from 'react';
 import { CarNum, LinkArrow, PlayerBadge, RaceCountdown, SectionLabel, TopBar } from '@/components/ui/primitives';
 import { InstallHint } from '@/components/ui/InstallHint';
 import { FB, FD, FI, FL, FM, T } from '@/lib/constants';
-import { computeAllDriverStats, computeStandings, getWeekConfig, ordinalSuffix, raceCountdown } from '@/lib/utils';
+import { computeAllDriverStats, computeStandings, getWeekConfig, isSeasonComplete, ordinalSuffix, raceCountdown, standingsThroughWeek } from '@/lib/utils';
 import { DEFAULT_DRIVERS } from '@/lib/data';
 import { RACE_QUOTES } from '@/lib/quotes';
 
@@ -366,8 +366,11 @@ export default function HomeScreen({ state, me, onNav }) {
   const currentRace = schedule.find(s => s.wk === currentWeek)
     || schedule[schedule.length - 1]
     || { track: 'Off-season', type: '—', len: 0, laps: 0, date: '', time: '', network: '' };
-  const seasonOver = !schedule.find(s => s.wk === currentWeek);
-  const standings = computeStandings(players, weeklyResults, currentWeek - 1);
+  // The season is over once the LAST scheduled race has been finalized — not
+  // when currentWeek runs off the end of the schedule, which never happens
+  // (saveAndAdvance pins currentWeek at the final week). See isSeasonComplete.
+  const seasonOver = isSeasonComplete(state);
+  const standings = computeStandings(players, weeklyResults, standingsThroughWeek(state));
   const sorted = [...standings].sort((a,b) => b.seasonPts - a.seasonPts);
   const rank = sorted.findIndex(s => s.id === me.id) + 1;
   const meStanding = standings.find(s => s.id === me.id);
@@ -393,6 +396,9 @@ export default function HomeScreen({ state, me, onNav }) {
   const raceLive = cd?.status === 'live';
 
   const statusLine = () => {
+    // Season's done — the wk-37 roster is still in draftState, which would
+    // otherwise read as "enter results when race finishes" forever.
+    if (seasonOver) return 'Season complete · final standings are in';
     if (phase === 'not-started') return 'Tap to start draft';
     if (phase === 'slot-pick') return `Pick-your-slot · ${draftState.slotPickIdx + 1}/${players.length}`;
     if (phase === 'ready') return 'Slots locked · waiting to start';
