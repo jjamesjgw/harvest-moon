@@ -14,6 +14,8 @@ import {
   AppFrame, TabBar, OnTheClockBanner, PullToRefresh, SaveBanner, YourTurnToast,
   JustPickedToast,
 } from '@/components/ui/primitives';
+import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
+import { installErrorBeacon } from '@/lib/errorBeacon';
 
 import HomeScreen          from '@/components/screens/HomeScreen';
 import LoginScreen         from '@/components/screens/LoginScreen';
@@ -173,6 +175,14 @@ export default function App() {
 
   const contentRef = useRef(null);
   const lastTurnRef = useRef(null);
+
+  // Global crash reporting. Uncaught errors and rejected promises post to
+  // /api/log, which surfaces them in the Vercel runtime logs — otherwise a
+  // crash on someone else's phone leaves no trace at all. The context getter
+  // is read at report time via a ref so handlers installed once still capture
+  // the current screen and player.
+  const beaconCtxRef = useRef({ screen: 'home', meId: null });
+  useEffect(() => installErrorBeacon(() => beaconCtxRef.current), []);
 
   const state = useMemo(() => migrateState(rawState), [rawState]);
   const setState = (updater) =>
@@ -443,6 +453,9 @@ export default function App() {
     return () => navigator.serviceWorker.removeEventListener('message', onMessage);
   }, []);
 
+  // Keep the crash-report context current without reinstalling handlers.
+  beaconCtxRef.current = { screen, meId };
+
   const activeTab = SCREEN_TO_TAB[screen] || 'home';
 
   const resetSeason = () => {
@@ -605,7 +618,11 @@ export default function App() {
         paddingBottom:'calc(76px + env(safe-area-inset-bottom))',
       }}
     >
-      {screens[screen]}
+      {/* Keyed by screen so recovering from a crash on one screen doesn't
+          leave a stale error state latched when the user navigates away. */}
+      <ErrorBoundary key={screen}>
+        {screens[screen]}
+      </ErrorBoundary>
     </PullToRefresh>
     <TabBar active={activeTab} onNav={onNav}/>
     {justPicked && !onDraftScreen && <JustPickedToast
