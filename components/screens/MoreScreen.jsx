@@ -2,6 +2,7 @@
 import React from 'react';
 import { MenuRow, SectionLabel, TopBar } from '@/components/ui/primitives';
 import { FD, FI, FL, T } from '@/lib/constants';
+import { finalizedWeeks } from '@/lib/utils';
 
 // Top-level menu. Was a long stack of 8-10 MenuRows in 4-5 SectionLabel
 // groups; now condenses to a single profile row, three category cards
@@ -11,7 +12,9 @@ import { FD, FI, FL, T } from '@/lib/constants';
 // each section gets a readable headline instead of a generic row.
 export default function MoreScreen({ state, me, onNav, onSignOut }) {
   const { schedule, currentWeek, weeklyResults } = state;
-  const lastResult = [...weeklyResults].sort((a, b) => b.wk - a.wk)[0];
+  // Completed weeks only — the Past Weeks descriptor shouldn't name a track
+  // whose results are still being entered.
+  const lastResult = finalizedWeeks(weeklyResults, currentWeek).sort((a, b) => b.wk - a.wk)[0];
   const isAdmin = !!me.isAdmin;
 
   return <div style={{ paddingBottom: 20 }}>

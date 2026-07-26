@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { BackChip, CarNum, PlayerBadge, TopBar } from '@/components/ui/primitives';
 import { FB, FD, FI, FL, SERIES, T } from '@/lib/constants';
-import { resolvePickDriver } from '@/lib/utils';
+import { finalizedWeeks, resolvePickDriver } from '@/lib/utils';
 
 // Small series tag rendered next to a bonus chip ("TRK", "O'R", "HL").
 function SeriesTag({ series }) {
@@ -19,7 +19,7 @@ function SeriesTag({ series }) {
 }
 
 export default function HistoryScreen({ state, me, onBack, onEdit, onNav }) {
-  const { players, schedule = [], weeklyResults, draftHistory = [] } = state;
+  const { players, schedule = [], weeklyResults, currentWeek, draftHistory = [] } = state;
   // Multi-expand. The single-expand UX fought the most common analytical
   // use case ("how did Trey do at Bristol last spring vs this fall?") —
   // opening row B closed row A. Now expansions accumulate; users can keep
@@ -34,10 +34,12 @@ export default function HistoryScreen({ state, me, onBack, onEdit, onNav }) {
   const collapseAll = () => setExpanded(new Set());
 
   const isAdmin = !!me?.isAdmin;
-  // Clone before sort: Array.prototype.sort mutates in place, and weeklyResults
-  // is shared React state — sorting it directly reorders the live array and
-  // corrupts any other reader (cron ingest, recap derivations, etc.).
-  const results = [...weeklyResults].sort((a,b) => b.wk - a.wk);
+  // Only completed weeks — an in-progress row (written on every keystroke as
+  // the commissioner enters results) would otherwise be counted as a
+  // "completed week" with a phantom winner computed from partial points.
+  // finalizedWeeks already returns a new array, so the sort can't mutate
+  // shared React state (which would corrupt other readers).
+  const results = finalizedWeeks(weeklyResults, currentWeek).sort((a,b) => b.wk - a.wk);
 
   return <div style={{ paddingBottom:20 }}>
     <TopBar
