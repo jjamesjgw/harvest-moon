@@ -42,6 +42,22 @@ function originAllowed(req) {
   try { return new URL(origin).host === host; } catch { return false; }
 }
 
+// A push endpoint is a URL that /api/notify will later POST to on the server's
+// behalf, so it is not merely a stored string — an unvalidated one turns a
+// signed-in member into a request forger. Requiring https also rejects the
+// http://169.254.169.254-style internal targets that make SSRF interesting.
+// Push services (FCM, Mozilla, Apple, Windows) all issue https URLs, so a
+// legitimate browser subscription is never rejected by this.
+const MAX_ENDPOINT = 2048;
+const MAX_KEY = 256;
+
+function endpointValid(endpoint) {
+  if (typeof endpoint !== 'string' || !endpoint || endpoint.length > MAX_ENDPOINT) return false;
+  let u;
+  try { u = new URL(endpoint); } catch { return false; }
+  return u.protocol === 'https:';
+}
+
 // Subscribe / refresh this browser's push subscription.
 export async function POST(req) {
   if (!originAllowed(req)) {
@@ -57,10 +73,13 @@ export async function POST(req) {
   catch { return NextResponse.json({ ok: false, error: 'bad-json' }, { status: 400 }); }
 
   const { endpoint, p256dh, auth } = body || {};
-  if (typeof endpoint !== 'string' || !endpoint) {
+  if (!endpointValid(endpoint)) {
     return NextResponse.json({ ok: false, error: 'bad-endpoint' }, { status: 400 });
   }
-  if (typeof p256dh !== 'string' || !p256dh || typeof auth !== 'string' || !auth) {
+  // The keys are base64url blobs of fixed size in practice (65 and 16 bytes
+  // encoded); the cap just keeps a member from parking megabytes in the row.
+  const keyValid = (k) => typeof k === 'string' && !!k && k.length <= MAX_KEY;
+  if (!keyValid(p256dh) || !keyValid(auth)) {
     return NextResponse.json({ ok: false, error: 'bad-keys' }, { status: 400 });
   }
 
@@ -95,8 +114,10 @@ export async function DELETE(req) {
   try { body = await req.json(); }
   catch { return NextResponse.json({ ok: false, error: 'bad-json' }, { status: 400 }); }
 
+  // Same shape check as POST. Nothing unsafe can be *stored* by a delete, but
+  // an unbounded string here is still a free query against the index.
   const { endpoint } = body || {};
-  if (typeof endpoint !== 'string' || !endpoint) {
+  if (!endpointValid(endpoint)) {
     return NextResponse.json({ ok: false, error: 'bad-endpoint' }, { status: 400 });
   }
 
