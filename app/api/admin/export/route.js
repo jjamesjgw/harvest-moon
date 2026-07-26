@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import crypto from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import { readSession } from '@/lib/session';
+import { buildExportPayload } from '@/lib/db/leagueExport';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -50,66 +51,36 @@ function authorized(req) {
   return false;
 }
 
-// Full league-state export.
+// Full league-state export, as a downloadable file.
 //
 // Why this exists: every recovery mechanism the app has — leagues_history,
 // leagues_snapshots, the pg_cron daily snapshot — writes to tables inside the
 // SAME Supabase database as public.leagues. If the project is deleted,
 // corrupted, paused past retention, or the account is lost, the primary row
 // and every "backup" of it vanish together. Migrations restore schema; they
-// don't restore a season. The only incidental offsite copies today are each
-// phone's localStorage mirror, which was never designed as a backup.
+// don't restore a season.
 //
-// Deliberately exports the league state only — NOT the contents of public.pins
-// or public.push_subs. Those hold bcrypt hashes and push subscription secrets;
-// copying them around multiplies the places a secret can leak, and both are
-// cheap to re-create (re-issue a PIN, re-tap "turn on notifications"). A
-// season's picks, results and draft history are the irreplaceable part. Row
-// counts are included so a restore can tell at a glance what else needs
-// re-provisioning.
+// This route is the manual path (tap the URL, save the file). The scheduled
+// path is /api/admin/backup, which ships the same payload to a standalone
+// backup Supabase project. Both share buildExportPayload so the two can't
+// drift apart.
 async function handle(req) {
   if (!authorized(req)) {
     return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });
   }
 
-  const { data, error } = await admin
-    .from('leagues')
-    .select('id, state, write_id, updated_at')
-    .eq('id', LEAGUE_ID)
-    .maybeSingle();
-
-  if (error) {
-    console.error('[admin/export]', error);
-    return NextResponse.json({ ok: false, error: 'select-failed' }, { status: 502 });
-  }
-  if (!data?.state) {
-    return NextResponse.json({ ok: false, error: 'no-league-row' }, { status: 404 });
+  const result = await buildExportPayload(admin, LEAGUE_ID);
+  if (!result.ok) {
+    if (result.error === 'no-league-row') {
+      return NextResponse.json({ ok: false, error: 'no-league-row' }, { status: 404 });
+    }
+    console.error('[admin/export]', result.detail || result.error);
+    return NextResponse.json({ ok: false, error: result.error }, { status: 502 });
   }
 
-  // Best-effort counts; a failure here must not block the export itself.
-  const countOf = async (table) => {
-    try {
-      const { count, error: e } = await admin
-        .from(table)
-        .select('*', { count: 'exact', head: true });
-      return e ? null : count;
-    } catch { return null; }
-  };
-  const [pins, pushSubs] = await Promise.all([countOf('pins'), countOf('push_subs')]);
-
-  const exportedAt = new Date().toISOString();
-  const payload = {
-    exportedAt,
-    leagueId: data.id,
-    write_id: data.write_id,
-    updated_at: data.updated_at,
-    // Not exported, only counted — see the note above.
-    rowCounts: { pins, push_subs: pushSubs },
-    state: data.state,
-  };
-
+  const { payload } = result;
   const body = JSON.stringify(payload, null, 2);
-  const filename = `harvest-moon-${LEAGUE_ID}-${exportedAt.slice(0, 10)}.json`;
+  const filename = `harvest-moon-${LEAGUE_ID}-${payload.exportedAt.slice(0, 10)}.json`;
 
   // Content-Disposition so hitting this from a browser saves a file the
   // commissioner can drop in Drive/iCloud — a copy that survives losing the
