@@ -2,6 +2,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { BackChip, MenuRow, SectionLabel, TopBar } from '@/components/ui/primitives';
 import { FB, FD, FI, FL, FM, ROUNDS_PER_WEEK, T } from '@/lib/constants';
+import { finalizedWeeks } from '@/lib/utils';
 
 // Sub-screen for one of the More categories: 'league', 'history', or
 // 'commissioner'. Reads only what the section needs from state so the same
@@ -10,8 +11,10 @@ import { FB, FD, FI, FL, FM, ROUNDS_PER_WEEK, T } from '@/lib/constants';
 // so the history stack and tab highlight behave naturally.
 export default function MoreSubScreen({ section, state, me, onNav, onSignOut, onReset }) {
   const [resetOpen, setResetOpen] = useState(false);
-  const { weeklyResults } = state;
-  const lastResult = [...weeklyResults].sort((a, b) => b.wk - a.wk)[0];
+  const { weeklyResults, currentWeek } = state;
+  // Completed weeks only — this labels the row that links to the recap, so an
+  // in-progress week here would name a different race than the recap shows.
+  const lastResult = finalizedWeeks(weeklyResults, currentWeek).sort((a, b) => b.wk - a.wk)[0];
 
   if (section === 'league') {
     return <div style={{ paddingBottom: 20 }}>

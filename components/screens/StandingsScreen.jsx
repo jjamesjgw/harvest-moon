@@ -14,12 +14,15 @@ import { computeStandings, finalizedWeeks } from '@/lib/utils';
 //                 (positive means the player CLIMBED; negative means they fell)
 //   streakTop3  — consecutive most-recent weeks ranked 1-3 by weekly pts
 //   lastWk      — wk number of the most recent completed week (for labels)
-function computePlayerTrends(state, playerId) {
+// `completedResults` must already be filtered to finished weeks — an
+// in-progress row would skew form, rank movement and the top-3 streak with
+// half-entered points.
+function computePlayerTrends(completedResults, players, playerId) {
   if (!playerId) return null;
-  const { weeklyResults, players } = state || {};
-  if (!weeklyResults || weeklyResults.length === 0) return null;
+  if (!completedResults || completedResults.length === 0) return null;
+  const weeklyResults = completedResults;
 
-  const completed = [...weeklyResults].sort((a, b) => a.wk - b.wk);
+  const completed = [...completedResults].sort((a, b) => a.wk - b.wk);
   const lastWk = completed[completed.length - 1].wk;
   const form = completed.slice(-3).map(w => Number(w.pts?.[playerId]) || 0);
   const formAvg = form.length
@@ -192,12 +195,17 @@ export default function StandingsScreen({ state, me, onNav }) {
   const { players, weeklyResults, currentWeek } = state;
   const standings = computeStandings(players, weeklyResults, currentWeek - 1);
   const sorted = [...standings].sort((a,b) => b.seasonPts - a.seasonPts);
+  // Completed weeks only, declared before its consumers below. Filters out the
+  // current week's in-progress row — written on every keystroke during results
+  // entry — which would otherwise appear as a By-Week column the season totals
+  // above it exclude, and would skew the trend signals with partial points.
+  const completedWeeks = finalizedWeeks(weeklyResults, currentWeek).sort((a,b) => b.wk - a.wk);
   // Trend signals computed per player. Keyed by id so the row map can do a
   // plain lookup. Re-runs whenever state changes — 6 players × ~14 weeks is
   // a few thousand ops, negligible.
   const trendsById = useMemo(() => {
     const map = {};
-    sorted.forEach(p => { map[p.id] = computePlayerTrends(state, p.id); });
+    sorted.forEach(p => { map[p.id] = computePlayerTrends(completedWeeks, players, p.id); });
     return map;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
@@ -211,12 +219,6 @@ export default function StandingsScreen({ state, me, onNav }) {
   const minPts = Math.min(...sorted.map(s => s.seasonPts));
   const maxPts = Math.max(...sorted.map(s => s.seasonPts));
   const spread = Math.max(1, maxPts - minPts);
-  // Most recent week on the left so the table opens to current-season context
-  // without forcing a scroll to the right edge. Filtered to completed weeks so
-  // the By-Week table can't show an in-progress column while the season totals
-  // above it (computed through currentWeek - 1) exclude that same week.
-  const completedWeeks = finalizedWeeks(weeklyResults, currentWeek).sort((a,b) => b.wk - a.wk);
-
   // Copy-to-clipboard state. After a successful copy we flip the chip to
   // "Copied" for ~1.5s so the user sees confirmation before it resets.
   const [copyState, setCopyState] = useState('idle'); // 'idle' | 'ok' | 'err'
