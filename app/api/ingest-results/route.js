@@ -113,7 +113,7 @@ async function handle(req) {
   if (!target) return NextResponse.json({ skipped: 'no-race-due' });
 
   const override = state.scheduleOverrides?.[target.wk]?.wikiSlug;
-  const slug = deriveWikiSlug(target.raceName, now.getFullYear(), override);
+  const slug = deriveWikiSlug(target.raceName, now.getFullYear(), override, target.track);
 
   const fetched = await fetchArticleHtml(slug);
   if (!fetched.ok) return NextResponse.json({ skipped: fetched.reason, wk: target.wk, slug });
