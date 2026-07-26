@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import { rollupPts } from '@/lib/scoring';
 import { parseRaceTime } from '@/lib/utils';
+import { DEFAULT_SCHEDULE } from '@/lib/data';
 import {
   deriveWikiSlug,
   fetchArticleHtml,
@@ -85,8 +86,27 @@ function findTargetRace(state, now) {
   const { schedule = [] } = state;
   const year = now.getFullYear();
   const fourHours = 4 * 60 * 60 * 1000;
+  // All-Star exhibition weeks are sourced from DEFAULT_SCHEDULE (code), not
+  // the persisted state.schedule, because the stored copy can lag code and
+  // miss the format flag — the same reason detectActiveTurn reads the code
+  // schedule (lib/utils.js).
+  const allStarWeeks = new Set(
+    DEFAULT_SCHEDULE.filter(s => s.format === 'all-star').map(s => s.wk),
+  );
+  // hasCupData lives at module scope now (it is also used by the write-retry
+  // loop against freshly-read state); only the finalized check is local.
+  const isFinalized = (wk) => !!(state.weeklyResults || []).find(w => w.wk === wk)?.finalized;
   let best = null;
   for (const r of schedule) {
+    // Never auto-ingest an All-Star exhibition. It has no Cup driverPoints, so
+    // hasCupData stays false forever and the week would be re-targeted on every
+    // cron run; worse, if the All-Star article ever parsed as a Final Stage
+    // table its points would overwrite the 50/0 all-or-nothing scoring and
+    // retroactively rewrite season standings.
+    if (allStarWeeks.has(r.wk) || r.format === 'all-star') continue;
+    // Skip weeks the commissioner has already finalized — their results are
+    // locked and must not be re-fetched or overwritten.
+    if (isFinalized(r.wk)) continue;
     const start = parseRaceTime(r.date, r.time, year);
     if (!start) continue;
     if ((now - start) < fourHours) continue;
