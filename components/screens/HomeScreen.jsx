@@ -1,122 +1,11 @@
 'use client';
 import React from 'react';
-import { CarNum, LinkArrow, PlayerBadge, RaceCountdown, SectionLabel, TopBar } from '@/components/ui/primitives';
+import { LinkArrow, PlayerBadge, RaceCountdown, SectionLabel, TopBar } from '@/components/ui/primitives';
 import { InstallHint } from '@/components/ui/InstallHint';
 import { FB, FD, FI, FL, FM, T } from '@/lib/constants';
-import { computeAllDriverStats, computeStandings, getWeekConfig, isSeasonComplete, ordinalSuffix, raceCountdown, standingsThroughWeek } from '@/lib/utils';
+import { computeStandings, getWeekConfig, isSeasonComplete, ordinalSuffix, raceCountdown, standingsThroughWeek } from '@/lib/utils';
 import { DEFAULT_DRIVERS } from '@/lib/data';
 import { RACE_QUOTES } from '@/lib/quotes';
-
-const STAT_AWARDS = [
-  { key: 'topScorer',   label: 'Top Scorer',   metric: r => `${r.totalPts} pts`,   sub: r => `${r.totalPicks}× drafted` },
-  { key: 'mostPicked',  label: 'Most Drafted', metric: r => `${r.totalPicks}×`,    sub: r => `${r.avgPts} avg`        },
-  { key: 'bestSleeper', label: 'Sleeper',      metric: r => `${r.avgPts} avg`,     sub: r => `${r.totalPicks}× drafted` },
-];
-
-function StatOfTheSeason({ state, onNav }) {
-  const all = React.useMemo(() => computeAllDriverStats(state), [state]);
-  // Rotate weekly. Fall through to the next non-null award if the
-  // selected slot is empty (e.g. Wk 1 before any race finalized).
-  const wk = state.currentWeek || 1;
-  let slot = null;
-  let driver = null;
-  for (let i = 0; i < STAT_AWARDS.length; i++) {
-    const candidate = STAT_AWARDS[(wk + i) % STAT_AWARDS.length];
-    const d = all.awards?.[candidate.key];
-    if (d) { slot = candidate; driver = d; break; }
-  }
-  if (!driver) return null;
-  return <>
-    <SectionLabel right={<LinkArrow onClick={() => onNav('drivers')}>All</LinkArrow>}>
-      Stat of the Season · {slot.label}
-    </SectionLabel>
-    <div style={{ padding:'14px 20px 20px' }}>
-      <button
-        onClick={() => onNav('drivers', { driverNum: driver.num })}
-        style={{
-          appearance:'none', width:'100%', textAlign:'left',
-          background: T.card, border:`1px solid ${T.line2}`, borderRadius:6,
-          padding:'12px 14px', cursor:'pointer',
-          display:'flex', alignItems:'center', gap:12,
-        }}>
-        <CarNum driver={driver} size={36}/>
-        <div style={{ flex:1, minWidth:0 }}>
-          <div style={{ fontFamily: FD, fontSize:16, fontWeight:600, letterSpacing:'-0.02em' }}>{driver.name}</div>
-          <div style={{ fontFamily: FI, fontStyle:'italic', fontSize:11, color: T.mute, marginTop:2 }}>
-            № {driver.num} · {driver.team} · {slot.sub(driver)}
-          </div>
-        </div>
-        <div style={{ fontFamily: FB, fontSize:18, fontWeight:600, color: T.hot, fontVariantNumeric:'tabular-nums' }}>{slot.metric(driver)}</div>
-      </button>
-    </div>
-  </>;
-}
-
-function YourRosterStrip({ state, me, onNav }) {
-  const { currentWeek, draftState, weeklyResults } = state;
-  const myPicks = (draftState?.picks || []).filter(p => p.playerId === me.id);
-
-  // Resolve each pick to its driver (Cup uses DEFAULT_DRIVERS + week extras;
-  // bonus series come from bonusDriversByWeek). We keep series alongside the
-  // resolved driver so the chip can render a small series tag for non-Cup.
-  const wkExtras = (state.weekDriversExtra || {})[currentWeek] || [];
-  const cupPool = [...DEFAULT_DRIVERS, ...wkExtras];
-  const resolved = myPicks.map(pk => {
-    const series = pk.series || 'Cup';
-    const pool = series === 'Cup'
-      ? cupPool
-      : (state.bonusDriversByWeek?.[currentWeek]?.[series] || []);
-    const driver = pool.find(d => d.num === pk.driverNum)
-      || { num: pk.driverNum, name: pk.driverName || `#${pk.driverNum}`, primary: T.mute, secondary: T.ink };
-    return { series, driver };
-  });
-
-  const wkResult = (weeklyResults || []).find(w => w.wk === currentWeek);
-  const myWkPts = wkResult?.pts?.[me.id];
-
-  return <>
-    <SectionLabel right={<LinkArrow onClick={() => onNav('team')}>View</LinkArrow>}>
-      Your Roster · Wk {String(currentWeek).padStart(2,'0')}
-    </SectionLabel>
-    <div style={{ padding:'14px 20px 20px' }}>
-      <div style={{
-        background: T.card, border:`1px solid ${T.line2}`, borderRadius:6,
-        padding:'12px 14px',
-        display:'flex', alignItems:'center', gap:10,
-      }}>
-        {resolved.length === 0 ? <>
-          {[0,1,2,3].map(i => <div key={i} style={{
-            width:36, height:36, borderRadius:4,
-            background:'rgba(20,17,13,0.06)',
-            border:`0.5px dashed ${T.line2}`,
-          }}/>)}
-          <div style={{ flex:1, fontFamily: FI, fontStyle:'italic', fontSize:12, color: T.mute, marginLeft:6 }}>
-            Drafting…
-          </div>
-        </> : <>
-          <div style={{ display:'flex', gap:6, flexWrap:'wrap', flex:1 }}>
-            {resolved.map(({ series, driver }, i) => <div key={`${series}:${driver.num}:${i}`} style={{ display:'inline-flex', alignItems:'center' }}>
-              <CarNum driver={driver} size={32} onClick={series === 'Cup' ? () => onNav('drivers', { driverNum: driver.num }) : undefined}/>
-              {series !== 'Cup' && <span style={{
-                marginLeft:-4, padding:'1px 4px', borderRadius:2,
-                background: T.hot, color:'#fff',
-                fontFamily: FL, fontSize:7, fontWeight:700,
-                letterSpacing:'0.16em', textTransform:'uppercase',
-                alignSelf:'flex-start',
-              }}>{series.slice(0,3)}</span>}
-            </div>)}
-          </div>
-          <div style={{ textAlign:'right', flexShrink:0 }}>
-            <div style={{ fontFamily: FL, fontSize:8, fontWeight:600, letterSpacing:'0.22em', textTransform:'uppercase', color: T.mute }}>Wk Pts</div>
-            <div style={{ fontFamily: FB, fontSize:18, fontWeight:600, color: T.ink, marginTop:2, fontVariantNumeric:'tabular-nums' }}>
-              {myWkPts != null ? myWkPts : '—'}
-            </div>
-          </div>
-        </>}
-      </div>
-    </div>
-  </>;
-}
 
 function LastRaceStrip({ state, me, onNav }) {
   const prevWk = (state.currentWeek || 1) - 1;
@@ -550,12 +439,6 @@ export default function HomeScreen({ state, me, onNav }) {
         <LinkArrow onClick={() => onNav('standings')}>View</LinkArrow>
       </div>
     </div>
-
-    <StatOfTheSeason state={state} onNav={onNav}/>
-
-    {/* Roster strip is for the regular Cup draft. All-Star picks already
-        appear inline on the dedicated hero — no need to repeat them here. */}
-    {!isAllStar && <YourRosterStrip state={state} me={me} onNav={onNav}/>}
 
     <LastRaceStrip state={state} me={me} onNav={onNav}/>
 
